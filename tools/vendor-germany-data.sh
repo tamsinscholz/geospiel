@@ -20,17 +20,17 @@ UA="geospiel-data-vendoring/1.0 (https://github.com/jan-scholz/geospiel; private
 MAPSHAPER="npx -y mapshaper@0.7.70"
 SVGO="npx -y svgo@4.1.0"
 
-# GISCO scale (10M = 1:10 million, 03M = 1:3 million) and how much of it to
-# keep. GISCO 10M is already generalised (Berlin has ~20 vertices), so it is
-# kept whole (100%): the 10% the original recipe named turned Berlin and
-# Hamburg into triangles. Overridable for experiments:
-#   SCALE=03M SIMPLIFY=30% tools/vendor-germany-data.sh
-SCALE="${SCALE:-10M}"
+# GISCO scale (10M = 1:10 million, 03M = 1:3 million, 01M = 1:1 million) and
+# how much of it to keep. 03M is kept whole (100%): 10M was too coarse for the
+# Stadtstaaten at game zoom (Berlin ~20 vertices), and simplifying it further
+# turned Berlin and Hamburg into triangles. Overridable for experiments:
+#   SCALE=01M SIMPLIFY=40% tools/vendor-germany-data.sh
+SCALE="${SCALE:-03M}"
 SIMPLIFY="${SIMPLIFY:-100%}"
 
 # Where the two geometry files go, and whether to stop after them (skipping the
 # Wappen). A variant for side-by-side comparison in tools/data-review.html:
-#   SCALE=03M GEO_OUT=tools/.cache/variants/03M GEOMETRY_ONLY=1 tools/vendor-germany-data.sh
+#   SCALE=10M GEO_OUT=tools/.cache/variants/10M GEOMETRY_ONLY=1 tools/vendor-germany-data.sh
 GEO_OUT="${GEO_OUT:-$ROOT/data}"
 GEO_OUT="$(mkdir -p "$GEO_OUT" && cd "$GEO_OUT" && pwd)"
 GEOMETRY_ONLY="${GEOMETRY_ONLY:-}"

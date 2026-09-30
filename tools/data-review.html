@@ -130,9 +130,9 @@
     // Geometry variants to flip between. Only the first is committed; the others
     // are generated into the gitignored download cache on demand (see `hint`).
     const VARIANTS = [
-      { label: '10M (committed)', dir: '../data/' },
-      { label: '03M', dir: '.cache/variants/03M/',
-        hint: 'SCALE=03M GEO_OUT=tools/.cache/variants/03M GEOMETRY_ONLY=1 tools/vendor-germany-data.sh' },
+      { label: '03M (committed)', dir: '../data/' },
+      { label: '10M', dir: '.cache/variants/10M/',
+        hint: 'SCALE=10M GEO_OUT=tools/.cache/variants/10M GEOMETRY_ONLY=1 tools/vendor-germany-data.sh' },
     ];
     const loadText = url => fetch(url).then(r => r.ok ? r.text() : Promise.reject(new Error(url)));
     await Promise.all(VARIANTS.map(async v => {

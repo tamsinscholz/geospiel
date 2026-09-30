@@ -47,11 +47,11 @@ The 16 federal states — the core geometry for every game mode.
 
 | | |
 |---|---|
-| **Source** | Eurostat GISCO, NUTS-1 regions, 1:10M scale, EPSG:4326, 2021 release |
-| **URL** | <https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_10M_2021_4326_LEVL_1.geojson> |
+| **Source** | Eurostat GISCO, NUTS-1 regions, 1:3M scale, EPSG:4326, 2021 release |
+| **URL** | <https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_03M_2021_4326_LEVL_1.geojson> |
 | **Filter** | `CNTR_CODE=DE` — yields exactly 16 features |
 | **Processing** | Filter to Germany → map NUTS-1 code to ISO 3166-2 key → `mapshaper -explode -simplify 100% keep-shapes -clean -dissolve` → TopoJSON (unquantized, 4 decimals) — see "Processing notes" below |
-| **Output** | `data/bundeslaender.topo.json` — object `bundeslaender`, 16 geometries, each `id` = ISO 3166-2 key (~21 KB) |
+| **Output** | `data/bundeslaender.topo.json` — object `bundeslaender`, 16 geometries, each `id` = ISO 3166-2 key (~64 KB) |
 | **Script** | `tools/vendor-germany-data.sh` (mapshaper 0.7.70 via `npx`; downloads cached in `tools/.cache/`, removed by `make clean`) |
 | **Licence** | Eurostat GISCO terms, **non-commercial use only, with attribution** — see "Attribution" below |
 
@@ -79,17 +79,26 @@ maintainer, 2026-09-30), so the GISCO terms are met as long as the notice above 
 
 **Processing notes.**
 
-- **No further simplification.** The recipe originally said `-simplify 10%`. GISCO 10M is
-  already generalised (Berlin has 20 vertices, Bremen 17), and 10% of it turned Berlin
-  and Hamburg into triangles. The data is kept whole; the script's `SIMPLIFY` knob stays
-  for experiments. If zoomed-in detail proves too coarse in the game, the same pipeline
-  runs on GISCO 1:3M (`SCALE=03M SIMPLIFY=30%` gives ~25 KB / ~62 KB), at the cost of
-  changing the documented source scale.
+- **Scale: 1:3M, kept whole.** The data was first vendored at GISCO 1:10M, which is so
+  generalised that the Stadtstaaten looked crude at game zoom (Berlin 20 vertices,
+  Bremen 18, Hamburg 23); the recipe's original `-simplify 10%` of it turned Berlin and
+  Hamburg into triangles. 1:3M (Berlin 66, Bremen 59, Hamburg 69, Saarland 110) was
+  compared side by side in `tools/data-review.html` and chosen (2026-09-30), for both
+  layers, with no further simplification. Measured alternatives, Bundesländer + Kulisse:
+  10M 21 + 138 KB; **03M 64 + 542 KB**; 01M at 40% 135 KB + 1.0 MB; 01M whole
+  244 KB + 2.8 MB. The script's `SCALE`/`SIMPLIFY` knobs stay for experiments.
+- **Possible later refinement (not done):** finer Bundesländer only (GISCO 1:1M, or BKG
+  VG250 under Datenlizenz Deutschland) over a coarser Kulisse. Almost all the bytes are
+  in the Kulisse, so this buys detail cheaply, but the two layers would no longer share
+  one border; the idea is to hide the mismatch by drawing a Germany-shaped underlay in
+  the Kulisse colour beneath the Bundesländer. Deferred by the maintainer: 1:3M everywhere
+  is good enough for now.
 - **One shared topology with the Kulisse (§6).** Both GISCO files are imported into one
   mapshaper dataset (`combine-files snap`), so the German land border is a single set of
   arcs used by both layers, and both files are written unquantized at 4 decimal places.
   Checked after generation: every German outer-border vertex on a land border is also a
-  Kulisse vertex (308 shared exactly); the rest are coastline.
+  Kulisse vertex (1:3M: 978 shared exactly; the only unshared inland points are on the
+  Jadebusen shore, i.e. coastline).
 
 **Key mapping.** GISCO identifies these features by NUTS-1 code, which does not match
 the ISO 3166-2 key the game uses. The translation belongs in the single `featureId()`
@@ -115,8 +124,9 @@ its identifiers:
 | `DEF` | `DE-SH` | Schleswig-Holstein |
 | `DEG` | `DE-TH` | Thüringen |
 
-**Verified against the fetched file** (`NUTS_RG_10M_2021_4326_LEVL_1.geojson`, downloaded
-2026-09-29): its 16 `CNTR_CODE=DE` features carry exactly these `NUTS_ID` values, and each
+**Verified against the fetched files** (`NUTS_RG_10M_2021_4326_LEVL_1.geojson`, downloaded
+2026-09-29, and `NUTS_RG_03M_2021_4326_LEVL_1.geojson`, 2026-09-30 — identical ids and
+names): its 16 `CNTR_CODE=DE` features carry exactly these `NUTS_ID` values, and each
 feature's `NAME_LATN` is the Bundesland named in the table (`DE1` Baden-Württemberg,
 `DE2` Bayern, `DE3` Berlin, `DE4` Brandenburg, `DE5` Bremen, `DE6` Hamburg, `DE7` Hessen,
 `DE8` Mecklenburg-Vorpommern, `DE9` Niedersachsen, `DEA` Nordrhein-Westfalen,
@@ -269,11 +279,11 @@ The muted, non-interactive land around Germany (spec: "The Kulisse layer").
 
 | | |
 |---|---|
-| **Source** | Eurostat GISCO, Countries 2020, 1:10M, EPSG:4326 — same provider and scale as §2 |
-| **URL** | <https://gisco-services.ec.europa.eu/distribution/v2/countries/geojson/CNTR_RG_10M_2020_4326.geojson> |
+| **Source** | Eurostat GISCO, Countries 2020, 1:3M, EPSG:4326 — same provider and scale as §2 |
+| **URL** | <https://gisco-services.ec.europa.eu/distribution/v2/countries/geojson/CNTR_RG_03M_2020_4326.geojson> |
 | **Filter** | Drop `CNTR_ID=DE` (Germany is §2), then clip to the box lon −12…34°E, lat 40…62°N |
 | **Processing** | Imported into the same mapshaper dataset as §2 (`combine-files snap`), `-clip bbox=-12,40,34,62`, same simplify/clean, TopoJSON unquantized at 4 decimals |
-| **Output** | `data/kulisse.topo.json` — object `kulisse`, one geometry per country, `id` = GISCO `CNTR_ID` (~138 KB) |
+| **Output** | `data/kulisse.topo.json` — object `kulisse`, one geometry per country, `id` = GISCO `CNTR_ID` (~542 KB, ~184 KB gzipped) |
 | **Licence** | Eurostat GISCO terms, as §2 — non-commercial, the same EuroGeographics notice |
 
 **Why this box.** Germany spans about 5.9–15.0°E and 47.3–55.1°N. On a wide screen the
@@ -288,8 +298,9 @@ inside it.
 **No gaps against the Bundesländer.** Because both layers come out of one topology, the
 German land border is literally the same vertices in both files (checked: every
 land-border vertex of the dissolved Bundesländer outline is a Kulisse vertex). GISCO's
-2020 country outline and 2021 NUTS outline are the same EuroGeographics-derived line at
-10M, so no snapping was needed. The Kulisse contains no German territory (checked by
+2020 country outline and 2021 NUTS outline are the same EuroGeographics-derived line; at
+1:3M mapshaper's `snap` joins 126 near-coincident points, and a 6× zoom along the
+French/Luxembourg border in `tools/data-review.html` shows no slivers or gaps. The Kulisse contains no German territory (checked by
 `test/data.test.mjs`).
 
 ---
