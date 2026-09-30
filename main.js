@@ -5,8 +5,7 @@ import { createGame } from './game-core.mjs';
   const $ = id => document.getElementById(id);
   const body = document.body;
 
-  const gameFlag       = $('game-flag');
-  const gameFlagWrap   = $('game-flag-wrap');
+  const gameWappen     = $('game-wappen');
   const gamePrompt     = $('game-prompt');
   const hudScore       = $('hud-score');
   const hudGuesses     = $('hud-guesses');
@@ -15,7 +14,7 @@ import { createGame } from './game-core.mjs';
   const feedbackText   = $('feedback-text');
   const btnNext        = $('btn-next');
   const countryPanel   = $('country-panel');
-  const infoFlag       = $('info-flag');
+  const infoWappen     = $('info-wappen');
   const infoName       = $('info-name');
   const infoCapital    = $('info-capital');
   const infoArea       = $('info-area');
@@ -31,10 +30,17 @@ import { createGame } from './game-core.mjs';
 
   /* === Constants === */
   const MODE_LABELS = {
-    'find': 'Find the Country',
-    'name-country': 'Name the Country',
-    'name-capital': 'Name the Capital',
+    'find': 'Bundesland finden',
+    'name-country': 'Bundesland benennen',
+    'name-capital': 'Landeshauptstadt benennen',
   };
+
+  /** Zoom range; `k = 1` is the full-Germany view. */
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 6;
+
+  /** Padding around Germany's projected bounds, in viewBox units. */
+  const MAP_PADDING = 20;
 
   /* === Game State ===
    *
@@ -78,23 +84,33 @@ import { createGame } from './game-core.mjs';
   }
 
   /* === Data === */
-  let countriesData = {};
+  let bundeslaenderData = {};
   let aliasesData = {};
   let geoFeatures = [];
-  let smallTargetFeatures = [];
+  let kulisseFeatures = [];
 
   /* === D3 Globals === */
   let projection, pathGenerator, zoom, g;
 
-  /* === Utility Functions === */
-  function featureId(d) { return String(d.id).padStart(3, '0'); }
+  /** The padded projected bounds of Germany: the SVG's fixed viewBox, and the
+   *  pan clamp. All map, zoom and pan arithmetic happens in these units. */
+  let viewBox = { x: 0, y: 0, width: 0, height: 0 };
 
-  function flagUrl(iso_a2) {
-    return `https://flagcdn.com/w160/${iso_a2}.png`;
+  /* === Utility Functions === */
+
+  /** The one place that knows how the geometry source spells its ids. The
+   *  vendored TopoJSON is already keyed by ISO 3166-2 (`DE-BY`). */
+  function featureId(d) { return d.id; }
+
+  /** The one place that knows where Landeswappen come from. */
+  function wappenUrl(key) {
+    return `wappen/${key.toLowerCase()}.svg`;
   }
 
+  const numberFormat = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+
   function formatNumber(n) {
-    return n.toLocaleString();
+    return numberFormat.format(n);
   }
 
   function clearAdvanceTimer() {
@@ -105,22 +121,22 @@ import { createGame } from './game-core.mjs';
   }
 
   function clearMapClasses() {
-    d3.selectAll('.country')
+    d3.selectAll('.bundesland')
       .classed('highlighted', false)
       .classed('target', false)
       .classed('wrong-guess', false);
   }
 
   function highlightTarget(id) {
-    d3.selectAll('.country').classed('target', false);
-    d3.select(`.country[data-id="${id}"]`).classed('target', true);
+    d3.selectAll('.bundesland').classed('target', false);
+    d3.select(`.bundesland[data-id="${id}"]`).classed('target', true);
   }
 
-  function fillCountryInfo(id) {
-    const c = countriesData[id];
+  function fillBundeslandInfo(id) {
+    const c = bundeslaenderData[id];
     if (!c) return;
-    infoFlag.src = flagUrl(c.iso_a2);
-    infoFlag.alt = c.name + ' flag';
+    infoWappen.src = wappenUrl(id);
+    infoWappen.alt = 'Landeswappen ' + c.name;
     infoName.textContent = c.name;
     infoCapital.textContent = c.capital;
     infoArea.textContent = formatNumber(c.area_km2) + ' km\u00B2';
@@ -129,22 +145,29 @@ import { createGame } from './game-core.mjs';
     infoNeighbours.textContent = c.neighbour_count;
   }
 
-  function zoomToCountry(id, duration = 750) {
+  /** The viewBox as a d3 extent, `[[x0, y0], [x1, y1]]`. */
+  function viewBoxExtent() {
+    return [[viewBox.x, viewBox.y], [viewBox.x + viewBox.width, viewBox.y + viewBox.height]];
+  }
+
+  function zoomToBundesland(id, duration = 750) {
     const feature = geoFeatures.find(f => featureId(f) === id);
     if (!feature) return;
     const [[x0, y0], [x1, y1]] = pathGenerator.bounds(feature);
-    const svgWidth = window.innerWidth;
-    const svgHeight = window.innerHeight;
     const dx = x1 - x0;
     const dy = y1 - y0;
     const x = (x0 + x1) / 2;
     const y = (y0 + y1) / 2;
-    const scale = Math.min(8, 0.9 / Math.max(dx / svgWidth, dy / svgHeight));
-    const tx = svgWidth / 2 - scale * x;
-    const ty = svgHeight / 2 - scale * y;
+    const scale = Math.min(MAX_ZOOM, 0.9 / Math.max(dx / viewBox.width, dy / viewBox.height));
+    const tx = viewBox.x + viewBox.width / 2 - scale * x;
+    const ty = viewBox.y + viewBox.height / 2 - scale * y;
 
+    // zoom.transform does not apply the pan clamp by itself, so constrain the
+    // target the same way a drag would be constrained.
+    const target = zoom.constrain()(
+      d3.zoomIdentity.translate(tx, ty).scale(scale), viewBoxExtent(), zoom.translateExtent());
     d3.select('#map').transition().duration(duration)
-      .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+      .call(zoom.transform, target);
   }
 
   function resetZoom(duration = 300) {
@@ -154,76 +177,86 @@ import { createGame } from './game-core.mjs';
 
   /* === Data Loading === */
   async function loadData() {
-    const [topology, countries, aliases, smallTargets] = await Promise.all([
-      d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json'),
-      d3.json('countries.json'),
-      d3.json('aliases.json'),
-      d3.json('small_targets.json').catch(() => ({ type: 'FeatureCollection', features: [] })),
+    const [topology, kulisseTopology, bundeslaender] = await Promise.all([
+      d3.json('data/bundeslaender.topo.json'),
+      d3.json('data/kulisse.topo.json'),
+      d3.json('data/bundeslaender.json'),
     ]);
 
-    countriesData = countries;
-    aliasesData = aliases;
-    geoFeatures = topojson.feature(topology, topology.objects.countries).features;
-    smallTargetFeatures = smallTargets.features;
+    bundeslaenderData = bundeslaender;
+    // Placeholder until the Bundesland alias table lands: the plain German
+    // names only, so Bundesland benennen is playable in the meantime.
+    aliasesData = Object.fromEntries(
+      Object.entries(bundeslaender).map(([key, b]) => [b.name, key]));
+    geoFeatures = topojson.feature(topology, topology.objects.bundeslaender).features;
+    kulisseFeatures = topojson.feature(kulisseTopology, kulisseTopology.objects.kulisse).features;
+    const germany = topojson.merge(topology, topology.objects.bundeslaender.geometries);
 
-    initMap();
+    initMap(germany);
   }
 
   /* === D3 Map Setup === */
-  function initMap() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    const svg = d3.select('#map')
-      .attr('width', width)
-      .attr('height', height);
-
+  function initMap(germany) {
+    const svg = d3.select('#map');
     g = d3.select('#map-group');
 
-    projection = d3.geoNaturalEarth1()
-      .scale(width / 6.3)
-      .translate([width / 2, height / 2]);
+    // Conic conformal with standard parallels inside Germany, centred on its
+    // central meridian, fitted to the outline. The fit size is arbitrary: the
+    // viewBox below is what maps these units onto the screen.
+    projection = d3.geoConicConformal()
+      .parallels([48.5, 53.5])
+      .rotate([-10.5, 0])
+      .fitSize([1000, 1000], germany);
 
     pathGenerator = d3.geoPath().projection(projection);
 
-    g.selectAll('path')
+    // A fixed viewBox around Germany's padded bounds; the SVG is sized by CSS
+    // and preserveAspectRatio re-fits and centres Germany on every resize, so
+    // there is no JS resize handler. Wide screens letterbox into the Kulisse.
+    const [[x0, y0], [x1, y1]] = pathGenerator.bounds(germany);
+    viewBox = {
+      x: x0 - MAP_PADDING,
+      y: y0 - MAP_PADDING,
+      width: x1 - x0 + 2 * MAP_PADDING,
+      height: y1 - y0 + 2 * MAP_PADDING,
+    };
+    svg.attr('viewBox', [viewBox.x, viewBox.y, viewBox.width, viewBox.height].join(' '));
+
+    // The Kulisse: neighbouring countries beneath the Bundesländer. Scenery
+    // only; CSS makes it pointer-events: none in every mode.
+    d3.select('#kulisse-group').selectAll('path')
+      .data(kulisseFeatures)
+      .join('path')
+      .attr('class', 'kulisse')
+      .attr('d', pathGenerator);
+
+    d3.select('#bundesland-group').selectAll('path')
       .data(geoFeatures)
       .join('path')
-      .attr('class', 'country')
+      .attr('class', 'bundesland')
       .attr('d', pathGenerator)
       .attr('data-id', d => featureId(d))
-      .on('click', onCountryClick)
-      .on('mouseenter', onCountryEnter)
-      .on('mouseleave', onCountryLeave);
+      .on('click', onBundeslandClick)
+      .on('mouseenter', onBundeslandEnter)
+      .on('mouseleave', onBundeslandLeave);
 
-    // Render enlarged click targets for small countries
-    const smallG = d3.select('#small-targets');
-    smallG.selectAll('path')
-      .data(smallTargetFeatures)
-      .join('path')
-      .attr('d', pathGenerator)
-      .attr('data-id', d => d.properties.id)
-      .on('click', function(event, d) {
-        const id = d.properties.id;
-        if (gameState.mode === 'find' && gameState.phase === 'playing') {
-          handleFindClick(id, this);
-        }
-      });
-
+    // The zoom extent defaults to the viewBox; making the translate extent the
+    // same rectangle leaves no pan at k = 1 and clamps to Germany plus the
+    // padding margin at every higher k.
     zoom = d3.zoom()
-      .scaleExtent([1, 24])
+      .scaleExtent([MIN_ZOOM, MAX_ZOOM])
+      .translateExtent(viewBoxExtent())
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
-        smallG.attr('transform', event.transform);
-        document.documentElement.style.setProperty('--zoom-k', event.transform.k);
       });
 
     svg.call(zoom);
 
-    // Click on empty SVG area to dismiss explore panel
+    // Click anywhere that is not a Bundesland (sea, letterbox, or the Kulisse,
+    // which lets clicks through) to dismiss the explore panel
     svg.on('click', (event) => {
-      if (event.target.tagName !== 'path' && gameState.mode === 'explore') {
-        d3.selectAll('.country').classed('highlighted', false);
+      if (!event.target.closest('.bundesland') && gameState.mode === 'explore') {
+        d3.selectAll('.bundesland').classed('highlighted', false);
         countryPanel.classList.remove('visible');
         lastTappedId = null;
       }
@@ -235,16 +268,16 @@ import { createGame } from './game-core.mjs';
   /* === Explore Mode === */
   let lastTappedId = null;
 
-  function onCountryEnter(event, d) {
+  function onBundeslandEnter(event, d) {
     if (gameState.mode !== 'explore') return;
     const id = featureId(d);
-    if (!countriesData[id]) return;
+    if (!bundeslaenderData[id]) return;
     d3.select(this).classed('highlighted', true);
-    fillCountryInfo(id);
+    fillBundeslandInfo(id);
     countryPanel.classList.add('visible');
   }
 
-  function onCountryLeave(event, d) {
+  function onBundeslandLeave(event, d) {
     if (gameState.mode !== 'explore') return;
     d3.select(this).classed('highlighted', false);
     countryPanel.classList.remove('visible');
@@ -252,13 +285,13 @@ import { createGame } from './game-core.mjs';
 
   function handleExploreClick(id, pathEl) {
     if (lastTappedId === id) {
-      d3.selectAll('.country').classed('highlighted', false);
+      d3.selectAll('.bundesland').classed('highlighted', false);
       countryPanel.classList.remove('visible');
       lastTappedId = null;
     } else {
-      d3.selectAll('.country').classed('highlighted', false);
+      d3.selectAll('.bundesland').classed('highlighted', false);
       d3.select(pathEl).classed('highlighted', true);
-      fillCountryInfo(id);
+      fillBundeslandInfo(id);
       countryPanel.classList.add('visible');
       lastTappedId = id;
     }
@@ -271,12 +304,12 @@ import { createGame } from './game-core.mjs';
     lastTappedId = null;
   }
 
-  /* === Country Click Handler === */
-  function onCountryClick(event, d) {
+  /* === Bundesland Click Handler === */
+  function onBundeslandClick(event, d) {
     const id = featureId(d);
 
     if (gameState.mode === 'explore') {
-      if (!countriesData[id]) return;
+      if (!bundeslaenderData[id]) return;
       handleExploreClick(id, this);
     } else if (gameState.mode === 'find' && gameState.phase === 'playing') {
       handleFindClick(id, this);
@@ -338,12 +371,12 @@ import { createGame } from './game-core.mjs';
     gameState.maxGuesses = parseInt(valGuesses.textContent);
     gameState.autoAdvance = chkAuto.checked;
 
-    // Only countries that have geometry on the map can be a round's target.
+    // Only Bundesländer that have geometry on the map can be a round's target.
     // Which ids have geometry is knowledge that belongs to this side of the
     // seam, so the filtering happens here and the game-core gets the result.
     const items = {};
-    for (const id of Object.keys(countriesData)) {
-      if (geoFeatures.some(f => featureId(f) === id)) items[id] = countriesData[id];
+    for (const id of Object.keys(bundeslaenderData)) {
+      if (geoFeatures.some(f => featureId(f) === id)) items[id] = bundeslaenderData[id];
     }
 
     game = createGame({
@@ -366,10 +399,10 @@ import { createGame } from './game-core.mjs';
 
     const state = game.state;
     const id = state.targetId;
-    const c = countriesData[id];
+    const c = bundeslaenderData[id];
 
-    gameFlag.src = flagUrl(c.iso_a2);
-    gameFlag.alt = c.name + ' flag';
+    gameWappen.src = wappenUrl(id);
+    gameWappen.alt = 'Landeswappen ' + c.name;
     gamePrompt.textContent = c.name;
     hudScore.textContent = state.score;
     hudGuesses.textContent = state.guessesLeft;
@@ -383,7 +416,7 @@ import { createGame } from './game-core.mjs';
 
     if (gameState.mode === 'name-country' || gameState.mode === 'name-capital') {
       highlightTarget(id);
-      zoomToCountry(id);
+      zoomToBundesland(id);
       guessInput.placeholder = gameState.mode === 'name-country'
         ? 'Name the country\u2026'
         : 'Name the capital\u2026';
@@ -394,7 +427,7 @@ import { createGame } from './game-core.mjs';
   function showFeedback(correct) {
     const state = game.state;
     const id = state.targetId;
-    const c = countriesData[id];
+    const c = bundeslaenderData[id];
 
     let answer;
     if (gameState.mode === 'name-capital') {
@@ -414,9 +447,9 @@ import { createGame } from './game-core.mjs';
     }
 
     btnNext.style.display = gameState.autoAdvance ? 'none' : '';
-    fillCountryInfo(id);
+    fillBundeslandInfo(id);
     highlightTarget(id);
-    zoomToCountry(id);
+    zoomToBundesland(id);
     hudScore.textContent = state.score;
 
     setPhase('feedback');

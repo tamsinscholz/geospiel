@@ -1,6 +1,5 @@
 /* === Reset + Global === */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --zoom-k: 1; }
 html, body {
   width: 100%; height: 100%; overflow: hidden;
   font-family: 'Inter', system-ui, sans-serif;
@@ -34,14 +33,30 @@ html, body {
 .btn-sm { font-size: 0.82rem; padding: 6px 12px; }
 
 /* === SVG Map === */
-#map { width: 100%; height: 100%; display: block; }
-.country { fill: #ccc; stroke: #666; stroke-width: calc(0.5px / var(--zoom-k)); cursor: pointer; }
-.country.highlighted { fill: #f90; stroke: #c00; stroke-width: calc(1.5px / var(--zoom-k)); }
-.country.target { fill: #4a90d9; stroke: #1a5fa0; stroke-width: calc(2px / var(--zoom-k)); }
-.country.wrong-guess { fill: #e05555; stroke: #a02020; stroke-width: calc(1.5px / var(--zoom-k)); }
-#small-targets { pointer-events: none; }
-#small-targets path { fill: rgba(74, 144, 217, 0.2); stroke: rgba(74, 144, 217, 0.4); stroke-width: calc(0.5px / var(--zoom-k)); cursor: pointer; pointer-events: none; }
-[data-mode="find"][data-phase="playing"] #small-targets path { pointer-events: all; }
+/* The SVG fills the viewport; its fixed viewBox + preserveAspectRatio keep
+   Germany fitted and centred at any size. Strokes are in screen pixels, so
+   borders keep a constant visual thickness at every zoom level. */
+#map { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+/* The icon-defs <svg hidden>: the UA [hidden] rule does not reach SVG
+   elements, so without this it takes 300x150 of layout space above #map */
+svg[hidden] { display: none; }
+#map path { vector-effect: non-scaling-stroke; }
+.bundesland { fill: #ccc; stroke: #666; stroke-width: 0.75px; cursor: pointer; }
+.bundesland.highlighted { fill: #f90; stroke: #c00; stroke-width: 1.5px; }
+.bundesland.target { fill: #4a90d9; stroke: #1a5fa0; stroke-width: 2px; }
+.bundesland.wrong-guess { fill: #e05555; stroke: #a02020; stroke-width: 1.5px; }
+/* Kulisse: muted scenery beneath the Bundesländer, never interactive */
+.kulisse { fill: #e3e3de; stroke: #cfcfc8; stroke-width: 0.5px; pointer-events: none; }
+
+/* Data credits: small, in the bottom-left corner (letterbox/Kulisse at the
+   fitted view), never intercepting clicks and beneath every panel */
+#map-credits {
+  position: fixed; left: 12px; bottom: 8px; z-index: 5;
+  max-width: 250px;
+  font-size: 0.65rem; line-height: 1.35; color: #7a8690;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff;
+  pointer-events: none;
+}
 
 /* === Overlay Screens === */
 .overlay-screen {
@@ -166,12 +181,12 @@ body[data-screen="stats"] #screen-stats { display: flex; }
 body[data-phase="playing"] #game-panel,
 body[data-phase="feedback"] #game-panel { display: grid; }
 
-/* Flag in game panel */
-.panel-flag img {
-  width: 64px; height: 42px; object-fit: cover;
-  border-radius: 4px; border: 1px solid #ccc;
+/* Landeswappen: a coat of arms, not a flag -- square box, contained, no fill */
+.panel-wappen img {
+  display: block;
+  width: 56px; height: 56px; object-fit: contain;
 }
-body[data-mode="name-capital"] #game-flag-wrap { display: none; }
+body[data-mode="name-capital"] #game-wappen-wrap { display: none; }
 
 /* Identity in game panel */
 .panel-identity { min-width: 0; }
@@ -230,7 +245,7 @@ body[data-mode="explore"] #country-panel.visible { display: grid; }
 .panel-facts {
   display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
 }
-.fact { display: flex; justify-content: space-between; font-size: 0.85rem; }
+.fact { display: flex; justify-content: space-between; gap: 8px; font-size: 0.85rem; }
 .fact-label { color: #888; white-space: nowrap; }
 .fact-label::after { content: ':'; }
 .fact-value { color: #222; font-weight: 600; text-align: right; white-space: nowrap; }
@@ -275,7 +290,7 @@ body[data-mode="explore"][data-phase="idle"] #btn-menu { display: block; }
     border-radius: 0 0 16px 16px;
     grid-template-columns: 1fr auto;
   }
-  #game-flag-wrap { display: none; }
+  #game-wappen-wrap { display: none; }
   .game-hud { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
   /* Bottom panels: edge-to-edge */
@@ -290,7 +305,7 @@ body[data-mode="explore"][data-phase="idle"] #btn-menu { display: block; }
     text-align: center;
     border-radius: 16px 16px 0 0;
   }
-  #country-panel .panel-flag { justify-self: center; }
+  #country-panel .panel-wappen { justify-self: center; }
   #country-panel .panel-facts { grid-template-columns: 1fr; }
 
   /* Input panel: flush bottom */

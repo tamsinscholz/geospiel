@@ -39,26 +39,26 @@ clamp", "The Kulisse layer", "Landeswappen presentation", "German UI strings".
 never calls the game-core, but both tickets rewrite the same wiring and running them
 concurrently means a painful merge.*
 
-**Status:** ready-for-agent
+**Status:** done — landed with commit "Put Erkunden on a clamped Germany map"
 
 ### Acceptance criteria
 
-- [ ] The map opens with the whole of Germany fitted and centred, at desktop width and at roughly 400px width
-- [ ] Each Bundesland renders as its own shape with a visible border; border lines stay a constant visual thickness at every zoom level
-- [ ] The map uses a fixed viewBox with `preserveAspectRatio`, and **no JS resize handler exists** — resizing the window re-fits and re-centres Germany
-- [ ] Zooming out all the way gives the full-Germany view; the scale range is `[1, 6]`
-- [ ] At `k = 1` panning cannot move the view at all
-- [ ] At maximum zoom, panning cannot leave Germany plus its small margin in any direction
-- [ ] The Kulisse renders beneath the Bundesländer, visibly muted, with no labels
-- [ ] The Kulisse is unclickable and never highlights, in every mode
-- [ ] Hovering a Bundesland highlights it and opens the info panel; moving off closes it
-- [ ] Tapping a Bundesland highlights it and opens the panel; tapping a different one switches; tapping the same one again, or tapping the Kulisse or empty space, dismisses it
-- [ ] The info panel shows the Landeswappen, the Bundesland name, the Landeshauptstadt, and Fläche / Einwohner / höchster Punkt / Nachbarländer, all labelled in German
-- [ ] The Landeswappen is rendered `contain` in a roughly square box with no background fill — **not** cropped to the old landscape flag box
-- [ ] Large numbers use German convention (`83.200.000`, `70.542 km²`)
-- [ ] The Erkunden quit button returns to the menu and resets the zoom to the full-Germany view
-- [ ] The mode selection screen and every Erkunden string are in German, and the page declares `lang="de"`
-- [ ] The small-target overlay is no longer rendered and its CSS is gone
-- [ ] The data credits required by `SOURCES.md` are visible whenever the map is shown: `Kartengrundlage: © EuroGeographics bezüglich der Verwaltungsgrenzen` (§2) and `Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024` (§7) — small, muted, unobtrusive (e.g. a corner of the map), and never covering a Bundesland or intercepting clicks. *Added 2026-09-30: this is the first ticket that shows the map and the population figures, and no other ticket owned the credits.*
-- [ ] `make test` passes
-- [ ] **Verified by driving the app, not by self-report:** report observed values for the fitted extent at both widths, the pan clamp at `k = 1` and at maximum zoom, a resize, and a Kulisse click
+- [x] The map opens with the whole of Germany fitted and centred, at desktop width and at roughly 400px width
+- [x] Each Bundesland renders as its own shape with a visible border; border lines stay a constant visual thickness at every zoom level
+- [x] The map uses a fixed viewBox with `preserveAspectRatio`, and **no JS resize handler exists** — resizing the window re-fits and re-centres Germany
+- [x] Zooming out all the way gives the full-Germany view; the scale range is `[1, 6]`
+- [x] At `k = 1` panning cannot move the view at all
+- [x] At maximum zoom, panning cannot leave Germany plus its small margin in any direction
+- [x] The Kulisse renders beneath the Bundesländer, visibly muted, with no labels
+- [x] The Kulisse is unclickable and never highlights, in every mode
+- [x] Hovering a Bundesland highlights it and opens the info panel; moving off closes it
+- [x] Tapping a Bundesland highlights it and opens the panel; tapping a different one switches; tapping the same one again, or tapping the Kulisse or empty space, dismisses it
+- [x] The info panel shows the Landeswappen, the Bundesland name, the Landeshauptstadt, and Fläche / Einwohner / höchster Punkt / Nachbarländer, all labelled in German
+- [x] The Landeswappen is rendered `contain` in a roughly square box with no background fill — **not** cropped to the old landscape flag box
+- [x] Large numbers use German convention (`83.200.000`, `70.542 km²`)
+- [x] The Erkunden quit button returns to the menu and resets the zoom to the full-Germany view
+- [x] The mode selection screen and every Erkunden string are in German, and the page declares `lang="de"`
+- [x] The small-target overlay is no longer rendered and its CSS is gone
+- [x] The data credits required by `SOURCES.md` are visible whenever the map is shown: `Kartengrundlage: © EuroGeographics bezüglich der Verwaltungsgrenzen` (§2) and `Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024` (§7) — small, muted, unobtrusive (e.g. a corner of the map), and never covering a Bundesland or intercepting clicks. *Added 2026-09-30: this is the first ticket that shows the map and the population figures, and no other ticket owned the credits.*
+- [x] `make test` passes
+- [x] **Verified by driving the app, not by self-report:** report observed values for the fitted extent at both widths, the pan clamp at `k = 1` and at maximum zoom, a resize, and a Kulisse click

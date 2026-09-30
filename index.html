@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>World Map Quiz</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>" />
+  <title>Deutschland-Quiz</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -18,15 +18,21 @@
   </defs></svg>
 
   <!-- SVG Map -->
-  <svg id="map"><g id="map-group"></g><g id="small-targets"></g></svg>
+  <svg id="map" preserveAspectRatio="xMidYMid meet"><g id="map-group"><g id="kulisse-group"></g><g id="bundesland-group"></g></g></svg>
+
+  <!-- Data credits (required by SOURCES.md §2 and §7) -->
+  <div id="map-credits">
+    <div>Kartengrundlage: &copy; EuroGeographics bezüglich der Verwaltungsgrenzen</div>
+    <div>Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024</div>
+  </div>
 
   <!-- Explore Quit Button -->
-  <button id="btn-menu" class="btn btn-danger btn-sm">Quit</button>
+  <button id="btn-menu" class="btn btn-danger btn-sm">Beenden</button>
 
   <!-- Game Panel (top) -->
   <div id="game-panel" class="panel">
-    <div id="game-flag-wrap" class="panel-flag">
-      <img id="game-flag" alt="Flag" />
+    <div id="game-wappen-wrap" class="panel-wappen">
+      <img id="game-wappen" alt="Landeswappen" />
     </div>
     <div class="panel-identity">
       <div id="game-prompt"></div>
@@ -52,18 +58,18 @@
 
     <!-- Country Info Panel -->
     <div id="country-panel" class="panel country-panel">
-      <div class="panel-flag">
-        <img id="info-flag" alt="Flag" />
+      <div class="panel-wappen">
+        <img id="info-wappen" alt="Landeswappen" />
       </div>
       <div class="panel-identity">
         <div class="panel-name" id="info-name"></div>
-        <div class="panel-capital" id="info-capital"></div>
+        <div class="panel-capital"><span class="fact-label">Landeshauptstadt</span> <span id="info-capital"></span></div>
       </div>
       <div class="panel-facts" id="info-facts">
-        <div class="fact"><span class="fact-label">Area</span><span class="fact-value" id="info-area"></span></div>
-        <div class="fact"><span class="fact-label">Population</span><span class="fact-value" id="info-pop"></span></div>
-        <div class="fact"><span class="fact-label">Highest Point</span><span class="fact-value" id="info-peak"></span></div>
-        <div class="fact"><span class="fact-label">Neighbours</span><span class="fact-value" id="info-neighbours"></span></div>
+        <div class="fact"><span class="fact-label">Fläche</span><span class="fact-value" id="info-area"></span></div>
+        <div class="fact"><span class="fact-label">Einwohner</span><span class="fact-value" id="info-pop"></span></div>
+        <div class="fact"><span class="fact-label">Höchster Punkt</span><span class="fact-value" id="info-peak"></span></div>
+        <div class="fact"><span class="fact-label">Nachbarländer</span><span class="fact-value" id="info-neighbours"></span></div>
       </div>
     </div>
 
@@ -81,30 +87,30 @@
   <!-- Overlay: Mode Selection -->
   <div id="screen-select" class="overlay-screen">
     <div class="overlay-card">
-      <h1 class="overlay-title">World Map Quiz</h1>
+      <h1 class="overlay-title">Deutschland-Quiz</h1>
       <div class="mode-cards">
         <button class="mode-card" data-mode-choice="explore">
-          <span class="mode-icon">&#127758;</span>
-          <span class="mode-name">Explore</span>
-          <span class="mode-desc">Browse the map and discover facts</span>
+          <span class="mode-icon">&#128506;&#65039;</span>
+          <span class="mode-name">Erkunden</span>
+          <span class="mode-desc">Karte erkunden und Fakten entdecken</span>
         </button>
         <button class="mode-card" data-mode-choice="find">
           <span class="mode-icon">&#128269;</span>
-          <span class="mode-name">Find the Country</span>
-          <span class="mode-desc">Click the correct country on the map</span>
+          <span class="mode-name">Bundesland finden</span>
+          <span class="mode-desc">Das richtige Bundesland auf der Karte anklicken</span>
         </button>
         <button class="mode-card" data-mode-choice="name-country">
           <span class="mode-icon">&#9999;&#65039;</span>
-          <span class="mode-name">Name the Country</span>
-          <span class="mode-desc">Type the name of the highlighted country</span>
+          <span class="mode-name">Bundesland benennen</span>
+          <span class="mode-desc">Den Namen des markierten Bundeslandes eingeben</span>
         </button>
         <button class="mode-card" data-mode-choice="name-capital">
           <span class="mode-icon">&#127963;&#65039;</span>
-          <span class="mode-name">Name the Capital</span>
-          <span class="mode-desc">Type the capital of the shown country</span>
+          <span class="mode-name">Landeshauptstadt benennen</span>
+          <span class="mode-desc">Die Landeshauptstadt des Bundeslandes eingeben</span>
         </button>
       </div>
-      <div class="overlay-footer"><a href="https://github.com/jan-scholz/world-game" target="_blank" rel="noopener"><svg class="gh-icon"><use href="#icon-github"/></svg> View source on GitHub</a> · &copy; 2026 Krautlabs Inc.</div>
+      <div class="overlay-footer"><a href="https://github.com/jan-scholz/world-game" target="_blank" rel="noopener"><svg class="gh-icon"><use href="#icon-github"/></svg> Quellcode auf GitHub</a> · &copy; 2026 Krautlabs Inc.</div>
     </div>
   </div>
 
