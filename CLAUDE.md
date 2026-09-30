@@ -63,3 +63,17 @@ Quiz modes share a settings screen (rounds 1–50, guesses 1–10, auto-advance 
 - **Answer validation:** Country names validated through `aliases.json` lookup (normalized). Capitals validated by exact normalized match against `countries.json`.
 - **CSS classes on `<path>`:** `.highlighted` (explore hover), `.target` (quiz highlight), `.wrong-guess` (brief red flash on wrong click).
 - **Responsive:** Mobile breakpoint at 600px — stacks panels vertically, hides flag in game panel, adjusts border radii.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as markdown files under `.scratch/<feature-slug>/` in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
