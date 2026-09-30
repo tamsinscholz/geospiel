@@ -25,6 +25,14 @@
     #map-section { display: flex; gap: 16px; }
     #map-wrap { flex: 1; min-width: 0; height: 78vh; background: var(--sea); border: 1px solid var(--line); }
     #map { width: 100%; height: 100%; display: block; }
+    #map-wrap { position: relative; }
+    #variants { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; align-items: center;
+                background: rgba(255,255,255,.9); border: 1px solid var(--line); padding: 6px 8px; font-size: 12px; }
+    #variants button { font: inherit; padding: 3px 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+    #variants button[aria-pressed="true"] { background: var(--fg); color: #fff; border-color: var(--fg); }
+    #variants button:disabled { cursor: not-allowed; opacity: .5; }
+    #map path { vector-effect: non-scaling-stroke; }
+    .variant[hidden] { display: none; }
     .kulisse { fill: var(--kulisse); stroke: var(--kulisse-line); stroke-width: 0.5; pointer-events: none; }
     .bundesland { fill: var(--land); stroke: var(--land-line); stroke-width: 0.8; cursor: pointer; }
     .bundesland:hover, .bundesland.highlighted { fill: var(--hover); }
@@ -61,6 +69,8 @@
       <code>data/bundeslaender.topo.json</code>, <code>data/kulisse.topo.json</code>,
       <code>data/bundeslaender.json</code>, <code>wappen/*.svg</code>.
       Dashed red frame = the padded Germany viewBox; everything outside it is letterbox, filled by the Kulisse.
+      Scroll or pinch to zoom the map (1–6×, the game's range); switch the geometry variant top-left or press <kbd>V</kbd>.
+      Checks, table and neighbour counts always use the committed <code>data/</code>.
     </div>
   </header>
 
@@ -70,7 +80,7 @@
   </section>
 
   <section id="map-section">
-    <div id="map-wrap"><svg id="map" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <div id="map-wrap"><svg id="map" preserveAspectRatio="xMidYMid meet"></svg><div id="variants"></div></div>
     <aside id="panel"><p class="muted">Hover a Bundesland.</p></aside>
   </section>
 
@@ -117,17 +127,95 @@
     const vb = [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad];
     const svg = d3.select('#map').attr('viewBox', vb.join(' '));
 
-    svg.append('g').selectAll('path').data(kulisse).join('path')
-      .attr('class', 'kulisse').attr('d', path);
-    svg.append('g').selectAll('path').data(states).join('path')
-      .attr('class', 'bundesland').attr('d', path)
-      .on('mouseenter', (event, d) => showPanel(d.id))
-      .append('title').text(d => d.id);
-    svg.append('rect').attr('class', 'viewbox-frame')
+    // Geometry variants to flip between. Only the first is committed; the others
+    // are generated into the gitignored download cache on demand (see `hint`).
+    const VARIANTS = [
+      { label: '10M (committed)', dir: '../data/' },
+      { label: '03M', dir: '.cache/variants/03M/',
+        hint: 'SCALE=03M GEO_OUT=tools/.cache/variants/03M GEOMETRY_ONLY=1 tools/vendor-germany-data.sh' },
+    ];
+    const loadText = url => fetch(url).then(r => r.ok ? r.text() : Promise.reject(new Error(url)));
+    await Promise.all(VARIANTS.map(async v => {
+      try {
+        const [bl, ku] = await Promise.all([loadText(v.dir + 'bundeslaender.topo.json'), loadText(v.dir + 'kulisse.topo.json')]);
+        const t = JSON.parse(bl), k = JSON.parse(ku);
+        v.states = topojson.feature(t, t.objects.bundeslaender).features;
+        v.kulisse = topojson.feature(k, k.objects.kulisse).features;
+        v.size = `${Math.round(bl.length / 1024)} KB + ${Math.round(ku.length / 1024)} KB`;
+      } catch { v.missing = true; }
+    }));
+
+    // Everything inside `zoomLayer` pans and zooms together; the projection is
+    // fitted once to the committed outline so every variant shares one frame.
+    const zoomLayer = svg.append('g');
+    for (const v of VARIANTS.filter(v => !v.missing)) {
+      v.group = zoomLayer.append('g').attr('class', 'variant');
+      v.group.append('g').selectAll('path').data(v.kulisse).join('path')
+        .attr('class', 'kulisse').attr('d', path);
+      v.group.append('g').selectAll('path').data(v.states).join('path')
+        .attr('class', 'bundesland').attr('d', path)
+        .on('mouseenter', (event, d) => showPanel(d.id))
+        .append('title').text(d => d.id);
+    }
+
+    const switcher = d3.select('#variants');
+    switcher.append('span').text('Geometrie:');
+    const buttons = switcher.selectAll('button').data(VARIANTS).join('button')
+      .text(v => v.missing ? `${v.label} (fehlt)` : `${v.label} · ${v.size}`)
+      .property('disabled', v => v.missing)
+      .attr('title', v => v.missing ? `Generate it from the repo root:\n${v.hint}` : null)
+      .on('click', (event, v) => showVariant(v));
+    const available = VARIANTS.filter(v => !v.missing);
+    function showVariant(active) {
+      for (const v of available) v.group.attr('hidden', v === active ? null : '');
+      buttons.attr('aria-pressed', v => v === active);
+      showVariant.current = active;
+    }
+    showVariant(available[0]);
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'v' && e.key !== 'V') return;
+      const i = available.indexOf(showVariant.current);
+      showVariant(available[(i + 1) % available.length]);
+    });
+
+    svg.call(d3.zoom().scaleExtent([1, 6])
+      .translateExtent([[vb[0], vb[1]], [vb[0] + vb[2], vb[1] + vb[3]]])
+      .on('zoom', e => {
+        zoomLayer.attr('transform', e.transform);
+        labels.attr('transform', d => `translate(${d.labelAt}) scale(${1 / e.transform.k})`);
+      }));
+
+    zoomLayer.append('rect').attr('class', 'viewbox-frame')
       .attr('x', vb[0]).attr('y', vb[1]).attr('width', vb[2]).attr('height', vb[3]);
-    svg.append('g').selectAll('text').data(states).join('text')
+    // A point comfortably inside the shape, for the label. The centroid alone
+    // fails for Brandenburg, whose centroid falls in the Berlin hole: sample a
+    // grid over the bounds and take the inside point nearest the centroid
+    // whose surrounding ring of points is inside too.
+    function labelPoint(d) {
+      for (const margin of [12, 6, 2]) {
+        const pt = labelPointWithin(d, margin);
+        if (pt) return pt;
+      }
+      return path.centroid(d);
+    }
+    function labelPointWithin(d, margin) {
+      const inside = ([x, y]) => d3.geoContains(d, projection.invert([x, y]));
+      const [[bx0, by0], [bx1, by1]] = path.bounds(d);
+      const c = path.centroid(d);
+      let best = null, bestDist = Infinity;
+      for (let i = 0; i <= 24; i++) for (let j = 0; j <= 24; j++) {
+        const pt = [bx0 + (bx1 - bx0) * i / 24, by0 + (by1 - by0) * j / 24];
+        const ring = [[0, 0], [margin, 0], [-margin, 0], [0, margin], [0, -margin]];
+        if (!ring.every(([dx, dy]) => inside([pt[0] + dx, pt[1] + dy]))) continue;
+        const dist = Math.hypot(pt[0] - c[0], pt[1] - c[1]);
+        if (dist < bestDist) { best = pt; bestDist = dist; }
+      }
+      return best;
+    }
+    const labels = zoomLayer.append('g').selectAll('text').data(states).join('text')
+      .each(d => { d.labelAt = labelPoint(d); })
       .attr('class', 'label')
-      .attr('transform', d => `translate(${path.centroid(d)})`)
+      .attr('transform', d => `translate(${d.labelAt})`)
       .text(d => d.id.slice(3));
 
     function showPanel(key) {

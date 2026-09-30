@@ -28,6 +28,13 @@ SVGO="npx -y svgo@4.1.0"
 SCALE="${SCALE:-10M}"
 SIMPLIFY="${SIMPLIFY:-100%}"
 
+# Where the two geometry files go, and whether to stop after them (skipping the
+# Wappen). A variant for side-by-side comparison in tools/data-review.html:
+#   SCALE=03M GEO_OUT=tools/.cache/variants/03M GEOMETRY_ONLY=1 tools/vendor-germany-data.sh
+GEO_OUT="${GEO_OUT:-$ROOT/data}"
+GEO_OUT="$(mkdir -p "$GEO_OUT" && cd "$GEO_OUT" && pwd)"
+GEOMETRY_ONLY="${GEOMETRY_ONLY:-}"
+
 GISCO=https://gisco-services.ec.europa.eu/distribution/v2
 NUTS_URL=$GISCO/nuts/geojson/NUTS_RG_${SCALE}_2021_4326_LEVL_1.geojson
 CNTR_URL=$GISCO/countries/geojson/CNTR_RG_${SCALE}_2020_4326.geojson
@@ -38,7 +45,7 @@ CNTR_URL=$GISCO/countries/geojson/CNTR_RG_${SCALE}_2020_4326.geojson
 # must reach well beyond what a rectangle would need).
 KULISSE_BBOX="-12,40,34,62"
 
-mkdir -p "$CACHE" "$ROOT/data" "$ROOT/wappen"
+mkdir -p "$CACHE" "$GEO_OUT" "$ROOT/wappen"
 
 fetch() { # url dest
   if [ ! -s "$2" ]; then
@@ -79,8 +86,8 @@ $MAPSHAPER -i "$CACHE/nuts1_$SCALE.geojson" "$CACHE/cntr_$SCALE.geojson" combine
   -simplify $SIMPLIFY keep-shapes target=* \
   -clean target=* \
   -dissolve id copy-fields=id target=bundeslaender \
-  -o "$ROOT/data/bundeslaender.topo.json" format=topojson target=bundeslaender id-field=id no-quantization precision=0.0001 \
-  -o "$ROOT/data/kulisse.topo.json" format=topojson target=kulisse id-field=id no-quantization precision=0.0001
+  -o "$GEO_OUT/bundeslaender.topo.json" format=topojson target=bundeslaender id-field=id no-quantization precision=0.0001 \
+  -o "$GEO_OUT/kulisse.topo.json" format=topojson target=kulisse id-field=id no-quantization precision=0.0001
 
 node -e '
 const t = JSON.parse(require("fs").readFileSync(process.argv[1]));
@@ -89,7 +96,9 @@ if (ids.length !== 16 || ids.some(id => !/^DE-[A-Z]{2}$/.test(id))) {
   console.error("unexpected Bundesländer ids:", ids); process.exit(1);
 }
 console.log("bundeslaender:", ids.sort().join(" "));
-' "$ROOT/data/bundeslaender.topo.json"
+' "$GEO_OUT/bundeslaender.topo.json"
+
+[ "$GEOMETRY_ONLY" = 1 ] && exit 0
 
 # --- Landeswappen -----------------------------------------------------------
 # key|Commons file name (the exact files listed in SOURCES.md §5). BW, BY and HH
