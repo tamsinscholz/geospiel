@@ -10,10 +10,16 @@ It centres around an interactive map displaying the outlines of every country in
 Start a server.
 
 ```sh
-python3 -m http.server 8000
+make run        # python3 -m http.server 8000
 ```
 
 Then open [localhost:8000](http://localhost:8000)
+
+Run the tests (Node's built-in test runner — no npm install, no build step):
+
+```sh
+make test
+```
 
 ## Stack
 - **D3.js v7** (via CDN) — data-driven SVG rendering and zoom behavior
@@ -46,8 +52,14 @@ python3 create_small_target_map.py --radius 50 --max_area 500
 index.html                  — page shell, D3 + TopoJSON CDN imports, SVG container
 style.css                   — fullscreen layout, country fill/stroke, .highlighted class
 main.js                     — projection setup, SVG render, zoom behavior, hover events
+game-core.mjs               — pure game rules: round order, guess accounting, answer matching
+test/game-core.test.mjs     — tests for game-core.mjs (node --test)
+Makefile                    — install / run / test / clean entry points
 countries.json              — country metadata keyed by ISO numeric ID
 aliases.json                — fuzzy country-name matching
 small_targets.json          — enlarged click targets for small countries (generated)
 create_small_target_map.py  — script to regenerate small_targets.json
 ```
+
+`main.js` is loaded as an ES module (`<script type="module">`) so it can import
+`game-core.mjs`; both are plain source files served as-is, with no bundler.

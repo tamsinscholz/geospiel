@@ -4,21 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Running the Project
 
-No build process or npm required. Open `index.html` directly in a browser, or serve it with any static file server:
+No build process or npm required. Serve the directory with any static file server:
 
 ```bash
-python3 -m http.server 8000
+make run    # python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
+`make test` runs the test suite on Node's built-in test runner (`node --test`);
+`make install` is a no-op because there are no dependencies.
+
+Note: the page needs an HTTP origin, not `file://` — it fetches `countries.json`
+and `aliases.json` and loads `main.js` as an ES module, both of which the
+browser blocks on a `file://` origin.
+
 ## Architecture
 
-Single-page vanilla JS application — 3 source files, no bundler, no npm.
+Single-page vanilla JS application — no bundler, no npm.
 
 | File | Purpose |
 |---|---|
 | `index.html` | Markup for SVG map, overlay screens (select, settings, stats), game panel, info panels, text input |
-| `main.js` | All logic — D3 map setup, zoom, game state machine, event wiring, data loading |
+| `main.js` | The browser shell — D3 map setup, zoom, DOM rendering, timers, event wiring, data loading, `localStorage`. Loaded as an ES module |
+| `game-core.mjs` | The game's rules, pure: round order, guess accounting, answer matching. Imports nothing, touches no DOM/D3/`localStorage`/timers. The only module under test |
+| `test/game-core.test.mjs` | Tests for `game-core.mjs` — `node --test`, `node:assert`, synthetic fixtures |
 | `style.css` | Layout, overlays, panels, buttons, responsive breakpoints |
 | `countries.json` | Country metadata keyed by 3-digit ISO numeric ID (name, capital, population, area, highest point, neighbour count, iso_a2) |
 | `aliases.json` | Normalized string → ISO ID mapping for fuzzy country-name matching (common misspellings, demonyms, alternate names) |
@@ -58,9 +67,10 @@ Quiz modes share a settings screen (rounds 1–50, guesses 1–10, auto-advance 
 ## Key Patterns
 
 - **Screen management:** Overlay screens (`screen-select`, `screen-settings`, `screen-stats`) shown/hidden via `data-phase` and `data-screen` attributes on `<body>`. Only one overlay is visible at a time.
-- **Game state:** Single `gameState` object tracks mode, phase (`idle`/`playing`/`feedback`), round order, score, guesses remaining. Phase and mode are mirrored to `<body>` data attributes so CSS drives visibility.
+- **Game state:** `game-core.mjs` owns round order, score, skipped count, remaining guesses and the current target; `main.js` keeps only the shell's own state (mode, phase, screen, the chosen settings, the auto-advance timer) and renders what the core reports. Phase and mode are mirrored to `<body>` data attributes so CSS drives visibility.
+- **The testing seam:** all round sequencing, guess accounting and answer matching go through `createGame(...)` in `game-core.mjs`; everything environmental (timers, CSS classes, zoom, panels, score history) stays in `main.js` and is verified by driving the app.
 - **Country identification:** Countries matched by 3-digit zero-padded ISO numeric ID (e.g. `"004"` = Afghanistan). TopoJSON features use numeric `d.id` which is padded via `String(d.id).padStart(3, '0')`.
-- **Answer validation:** Country names validated through `aliases.json` lookup (normalized). Capitals validated by exact normalized match against `countries.json`.
+- **Answer validation:** one canonical `normalize()` in `game-core.mjs` is applied to both the typed answer and the reference answer (trim/lowercase, `ß`→`ss`, drop diacritics, collapse `ae`/`oe`/`ue`, strip non-alphanumerics). Names are matched through `aliases.json`, capitals against the item's `capital` (plus optional `capital_variants`).
 - **CSS classes on `<path>`:** `.highlighted` (explore hover), `.target` (quiz highlight), `.wrong-guess` (brief red flash on wrong click).
 - **Responsive:** Mobile breakpoint at 600px — stacks panels vertically, hides flag in game panel, adjusts border radii.
 

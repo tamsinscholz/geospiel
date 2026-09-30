@@ -1,3 +1,5 @@
+import { createGame } from './game-core.mjs';
+
 (() => {
   /* === DOM References === */
   const $ = id => document.getElementById(id);
@@ -34,7 +36,14 @@
     'name-capital': 'Name the Capital',
   };
 
-  /* === Game State === */
+  /* === Game State ===
+   *
+   * Only the shell's own state lives here: which mode and screen are showing,
+   * the settings the user picked, and the auto-advance timer handle. Round
+   * order, score, skipped count, remaining guesses and the current target all
+   * belong to the game-core instance in `game` — this file never computes
+   * them, it only renders them.
+   */
   const gameState = {
     mode: null,
     phase: 'idle',
@@ -42,14 +51,11 @@
     totalRounds: 10,
     maxGuesses: 3,
     autoAdvance: false,
-    roundOrder: [],
-    currentRound: 0,
-    score: 0,
-    skipped: 0,
-    guessesLeft: 0,
-    targetId: null,
     advanceTimer: null,
   };
+
+  /** The current game-core instance; null outside a quiz. */
+  let game = null;
 
   /* === State Transitions === */
   function setPhase(phase) {
@@ -83,24 +89,12 @@
   /* === Utility Functions === */
   function featureId(d) { return String(d.id).padStart(3, '0'); }
 
-  function normalize(str) {
-    return str.trim().toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  }
-
   function flagUrl(iso_a2) {
     return `https://flagcdn.com/w160/${iso_a2}.png`;
   }
 
   function formatNumber(n) {
     return n.toLocaleString();
-  }
-
-  function shuffleArray(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
   }
 
   function clearAdvanceTimer() {
@@ -291,50 +285,40 @@
 
   /* === Find the Country === */
   function handleFindClick(id, pathEl) {
-    if (id === gameState.targetId) {
-      gameState.score++;
-      showFeedback(true);
-    } else {
-      gameState.guessesLeft--;
-      hudGuesses.textContent = gameState.guessesLeft;
-      d3.select(pathEl).classed('wrong-guess', true);
-      setTimeout(() => d3.select(pathEl).classed('wrong-guess', false), 600);
+    const result = game.guessById(id);
+    if (result.ignored) return;
 
-      if (gameState.guessesLeft <= 0) {
-        showFeedback(false);
-      }
+    if (result.correct) {
+      showFeedback(true);
+      return;
+    }
+
+    hudGuesses.textContent = result.guessesLeft;
+    d3.select(pathEl).classed('wrong-guess', true);
+    setTimeout(() => d3.select(pathEl).classed('wrong-guess', false), 600);
+
+    if (result.exhausted) {
+      showFeedback(false);
     }
   }
 
   /* === Text Input Submission === */
   function handleSubmit() {
-    const raw = guessInput.value;
-    if (!raw.trim()) return;
+    const result = game.guessByText(guessInput.value);
+    if (result.ignored) return;
 
-    const input = normalize(raw);
-    const id = gameState.targetId;
-    const c = countriesData[id];
-    let correct = false;
-
-    if (gameState.mode === 'name-country') {
-      correct = (aliasesData[input] === id);
-    } else if (gameState.mode === 'name-capital') {
-      correct = (normalize(c.capital) === input);
+    if (result.correct) {
+      showFeedback(true);
+      return;
     }
 
-    if (correct) {
-      gameState.score++;
-      showFeedback(true);
+    hudGuesses.textContent = result.guessesLeft;
+    if (result.exhausted) {
+      showFeedback(false);
     } else {
-      gameState.guessesLeft--;
-      hudGuesses.textContent = gameState.guessesLeft;
-      if (gameState.guessesLeft <= 0) {
-        showFeedback(false);
-      } else {
-        inputFeedback.textContent = `Wrong \u2014 ${gameState.guessesLeft} guess${gameState.guessesLeft !== 1 ? 'es' : ''} left`;
-        guessInput.value = '';
-        guessInput.focus();
-      }
+      inputFeedback.textContent = `Wrong \u2014 ${result.guessesLeft} guess${result.guessesLeft !== 1 ? 'es' : ''} left`;
+      guessInput.value = '';
+      guessInput.focus();
     }
   }
 
@@ -354,36 +338,42 @@
     gameState.maxGuesses = parseInt(valGuesses.textContent);
     gameState.autoAdvance = chkAuto.checked;
 
-    const validIds = Object.keys(countriesData).filter(id =>
-      geoFeatures.some(f => featureId(f) === id)
-    );
-    shuffleArray(validIds);
-    gameState.roundOrder = validIds.slice(0, gameState.totalRounds);
-    gameState.currentRound = 0;
-    gameState.score = 0;
-    gameState.skipped = 0;
+    // Only countries that have geometry on the map can be a round's target.
+    // Which ids have geometry is knowledge that belongs to this side of the
+    // seam, so the filtering happens here and the game-core gets the result.
+    const items = {};
+    for (const id of Object.keys(countriesData)) {
+      if (geoFeatures.some(f => featureId(f) === id)) items[id] = countriesData[id];
+    }
+
+    game = createGame({
+      items,
+      aliases: aliasesData,
+      mode: gameState.mode,
+      totalRounds: gameState.totalRounds,
+      maxGuesses: gameState.maxGuesses,
+    });
 
     setMode(gameState.mode);
     setScreen(null);
     startRound();
   }
 
+  /** Render whatever round the game-core is now on. */
   function startRound() {
     clearMapClasses();
     clearAdvanceTimer();
 
-    const id = gameState.roundOrder[gameState.currentRound];
-    gameState.targetId = id;
-    gameState.guessesLeft = gameState.maxGuesses;
-
+    const state = game.state;
+    const id = state.targetId;
     const c = countriesData[id];
 
     gameFlag.src = flagUrl(c.iso_a2);
     gameFlag.alt = c.name + ' flag';
     gamePrompt.textContent = c.name;
-    hudScore.textContent = gameState.score;
-    hudGuesses.textContent = gameState.guessesLeft;
-    progressFill.style.width = ((gameState.currentRound) / gameState.totalRounds * 100) + '%';
+    hudScore.textContent = state.score;
+    hudGuesses.textContent = state.guessesLeft;
+    progressFill.style.width = (state.currentRound / state.totalRounds * 100) + '%';
 
     guessInput.value = '';
     inputFeedback.textContent = '';
@@ -402,7 +392,8 @@
   }
 
   function showFeedback(correct) {
-    const id = gameState.targetId;
+    const state = game.state;
+    const id = state.targetId;
     const c = countriesData[id];
 
     let answer;
@@ -426,7 +417,7 @@
     fillCountryInfo(id);
     highlightTarget(id);
     zoomToCountry(id);
-    hudScore.textContent = gameState.score;
+    hudScore.textContent = state.score;
 
     setPhase('feedback');
 
@@ -439,8 +430,7 @@
 
   function advanceRound() {
     clearAdvanceTimer();
-    gameState.currentRound++;
-    if (gameState.currentRound >= gameState.totalRounds) {
+    if (game.next().finished) {
       showStats();
     } else {
       startRound();
@@ -448,8 +438,12 @@
   }
 
   function skipRound() {
-    gameState.skipped++;
-    advanceRound();
+    clearAdvanceTimer();
+    if (game.skip().finished) {
+      showStats();
+    } else {
+      startRound();
+    }
   }
 
   function quitGame() {
@@ -458,6 +452,7 @@
       returnToMenu();
       return;
     }
+    game.quit();
     showStats();
   }
 
@@ -477,18 +472,12 @@
     clearAdvanceTimer();
     clearMapClasses();
 
-    let roundsPlayed;
-    if (gameState.currentRound >= gameState.totalRounds) {
-      roundsPlayed = gameState.totalRounds;
-    } else {
-      roundsPlayed = gameState.currentRound + 1;
-    }
+    const { roundsPlayed, correct, skipped, percent } = game.summary();
 
     $('stat-rounds').textContent = roundsPlayed;
-    $('stat-correct').textContent = gameState.score;
-    $('stat-skipped').textContent = gameState.skipped;
-    const pct = roundsPlayed > 0 ? Math.round((gameState.score / roundsPlayed) * 100) : 0;
-    $('stat-score').textContent = pct + '%';
+    $('stat-correct').textContent = correct;
+    $('stat-skipped').textContent = skipped;
+    $('stat-score').textContent = percent + '%';
 
     const hist = getHistory(gameState.mode);
     const avgRow = $('stat-avg-row');
@@ -506,7 +495,7 @@
     } else {
       avgRow.style.display = 'none';
     }
-    saveHistory(gameState.mode, { rounds: roundsPlayed, correct: gameState.score, skipped: gameState.skipped });
+    saveHistory(gameState.mode, { rounds: roundsPlayed, correct, skipped });
 
     setPhase('idle');
     setScreen('stats');
