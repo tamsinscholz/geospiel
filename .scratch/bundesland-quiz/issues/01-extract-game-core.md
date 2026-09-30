@@ -45,20 +45,20 @@ matching", "Build and run".
 
 **Blocked by:** None — can start immediately. Runs in parallel with 02.
 
-**Status:** ready-for-agent
+**Status:** done — landed in `283c540`
 
 ### Acceptance criteria
 
-- [ ] The game-core module has no reference to the DOM, D3, `localStorage`, `setTimeout` or any global beyond `Math`
-- [ ] `shuffle` is injected, so tests get a deterministic round order without stubbing `Math.random`
-- [ ] The existing app calls the module for round sequencing, guess accounting and answer matching rather than holding that logic itself
-- [ ] Timers, visual effects, panel visibility and score persistence stay outside the module
-- [ ] A `Makefile` exists with `install`, `run`, `test`, `clean` and `clean-all`; `make test` runs the suite and `make run` starts the static server
-- [ ] **No npm dependency is added** — tests run on Node's built-in test runner and `node:assert`, so "no build process, no npm required" still holds
-- [ ] `make install` is a no-op and the app still opens by loading the page directly, with no build step
-- [ ] Tests cover guess accounting: correct answer scores and moves to feedback; wrong answer decrements and stays playing; last wrong guess moves to feedback without scoring; guesses reset each round; empty and whitespace input consume no guess; repeating a wrong guess still costs a guess
-- [ ] Tests cover round sequencing: no repeats; length equals the configured count; a count above the number of available items is clamped; advancing past the last round reports finished; skip increments skipped without touching score or entering feedback; quit reports finished and counts the in-progress round as played; the summary percentage is over rounds *played*, not rounds configured
-- [ ] Tests cover normalization: umlaut, transliterated and bare forms all canonicalise together (`Württemberg` / `Wuerttemberg` / `Wurttemberg`); `ß` folds to `ss`; hyphens, spaces and case are ignored
-- [ ] Tests cover matching: an unknown string is rejected rather than throwing; a confusable pair stays distinct under the normalizer
-- [ ] `make test` passes
-- [ ] **Verified by driving the app, not by self-report:** the world quiz is played through in all four modes and behaves as it did before — report the observed score, guess counts and feedback text
+- [x] The game-core module has no reference to the DOM, D3, `localStorage`, `setTimeout` or any global beyond `Math`
+- [x] `shuffle` is injected, so tests get a deterministic round order without stubbing `Math.random`
+- [x] The existing app calls the module for round sequencing, guess accounting and answer matching rather than holding that logic itself
+- [x] Timers, visual effects, panel visibility and score persistence stay outside the module
+- [x] A `Makefile` exists with `install`, `run`, `test`, `clean` and `clean-all`; `make test` runs the suite and `make run` starts the static server
+- [x] **No npm dependency is added** — tests run on Node's built-in test runner and `node:assert`, so "no build process, no npm required" still holds
+- [ ] `make install` is a no-op and the app still opens by loading the page directly, with no build step — *partly: no-op install and no build step hold, but the page has always needed an HTTP origin (it fetches JSON), so "loading directly" from `file://` was never true; docs corrected in `283c540`*
+- [x] Tests cover guess accounting: correct answer scores and moves to feedback; wrong answer decrements and stays playing; last wrong guess moves to feedback without scoring; guesses reset each round; empty and whitespace input consume no guess; repeating a wrong guess still costs a guess
+- [x] Tests cover round sequencing: no repeats; length equals the configured count; a count above the number of available items is clamped; advancing past the last round reports finished; skip increments skipped without touching score or entering feedback; quit reports finished and counts the in-progress round as played; the summary percentage is over rounds *played*, not rounds configured
+- [x] Tests cover normalization: umlaut, transliterated and bare forms all canonicalise together (`Württemberg` / `Wuerttemberg` / `Wurttemberg`); `ß` folds to `ss`; hyphens, spaces and case are ignored
+- [x] Tests cover matching: an unknown string is rejected rather than throwing; a confusable pair stays distinct under the normalizer
+- [x] `make test` passes
+- [x] **Verified by driving the app, not by self-report:** the world quiz is played through in all four modes and behaves as it did before — report the observed score, guess counts and feedback text
