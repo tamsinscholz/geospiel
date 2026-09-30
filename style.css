@@ -57,14 +57,35 @@ svg[hidden] { display: none; }
   .hit-target { pointer-events: stroke; stroke-width: 20px; }
 }
 
-/* Data credits: small, in the bottom-left corner (letterbox/Kulisse at the
-   fitted view), never intercepting clicks and beneath every panel */
-#map-credits {
-  position: fixed; left: 12px; bottom: 8px; z-index: 5;
-  max-width: 250px;
-  font-size: 0.65rem; line-height: 1.35; color: #7a8690;
-  text-shadow: 0 0 3px #fff, 0 0 3px #fff;
+/* Data credits: an (i) button, first item of the bottom panel stack, so it
+   sits just above whichever bottom panel is open (or at the stack's bottom
+   edge when none is) and never covers one. The popover shows on hover
+   (mouse only, so a touch tap can't leave a sticky hover behind), on keyboard
+   focus, or while JS has set aria-expanded="true" (tap to toggle). */
+.credits { position: relative; align-self: flex-start; }
+.credits-btn {
+  position: relative; display: block;
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 1px solid #b8c2cc; background: rgba(255,255,255,0.85); color: #6b7684;
+  font: italic 700 13px/22px Georgia, 'Times New Roman', serif; text-align: center;
+  cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+/* A 32px hit area around the 24px circle */
+.credits-btn::before { content: ''; position: absolute; inset: -5px; border-radius: 50%; }
+.credits-btn:hover, .credits-btn[aria-expanded="true"] { color: #333; border-color: #7a8690; }
+.credits-popover {
+  display: none;
+  position: absolute; left: 0; bottom: calc(100% + 6px);
+  width: max-content; max-width: min(300px, calc(100vw - 32px));
+  padding: 8px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.97); box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  font-size: 0.7rem; line-height: 1.4; color: #555;
   pointer-events: none;
+}
+.credits-btn:focus-visible + .credits-popover,
+.credits-btn[aria-expanded="true"] + .credits-popover { display: block; }
+@media (hover: hover) {
+  .credits-btn:hover + .credits-popover { display: block; }
 }
 
 /* === Overlay Screens === */
@@ -189,6 +210,8 @@ body[data-screen="stats"] #screen-stats { display: flex; }
 }
 body[data-phase="playing"] #game-panel,
 body[data-phase="feedback"] #game-panel { display: grid; }
+/* A round in feedback is already answered: nothing left to skip */
+body[data-phase="feedback"] #btn-skip { display: none; }
 
 /* Landeswappen: a coat of arms, not a flag -- square box, contained, no fill */
 .panel-wappen img {
@@ -323,6 +346,9 @@ body[data-mode="explore"][data-phase="idle"] #btn-menu { display: block; }
   }
   #country-panel .panel-wappen { justify-self: center; }
   #country-panel .panel-facts { grid-template-columns: 1fr; }
+
+  /* Credits button: clear of the screen edge when no panel is open */
+  .credits { margin-bottom: 8px; }
 
   /* Input panel: flush bottom */
   #input-panel { border-radius: 16px 16px 0 0; }

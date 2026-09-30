@@ -19,9 +19,10 @@ per the spec. Sources that use other schemes are normalised on the way in.
 "no build process, no npm required" property is preserved. The processing recipes below
 are one-off data-preparation steps, run by hand only when data needs regenerating (via
 `npx` or a system install of the tool, never as a project dependency); their committed
-JSON output is what the app fetches at runtime. This is how the world quiz's generated
-click-target data was produced and committed, and it keeps the tooling off the critical
-path for running or changing the game.
+JSON output is what the app fetches at runtime. The world quiz this game replaced
+handled its generated click-target data the same way (a one-off script whose output was
+committed), and it keeps the tooling off the critical path for running or changing the
+game.
 
 ---
 
@@ -307,9 +308,11 @@ French/Luxembourg border in `tools/data-review.html` shows no slivers or gaps. T
 
 ## 7. Bundesland metadata
 
-`data/bundeslaender.json`, keyed by ISO 3166-2 key, same field shape as the world quiz's
-`countries.json` minus `iso_a2`:
-`{ name, capital, population, area_km2, highest_point: { name, elevation_m }, neighbour_count }`.
+`data/bundeslaender.json`, keyed by ISO 3166-2 key, the same field shape the world quiz's
+country metadata had, minus its flag code:
+`{ name, capital, capital_variants?, population, area_km2, highest_point: { name, elevation_m }, neighbour_count }`
+(`capital_variants` is an optional list of extra accepted spellings, currently `Munich`
+for `DE-BY` and `Hanover` for `DE-NI`).
 **Hand-curated** — not produced by the script. To refresh, edit the JSON and run
 `make test`.
 
@@ -337,7 +340,7 @@ Destatis table above.
 | | |
 |---|---|
 | **Source** | Wikipedia (de), "Liste der höchsten Berge der deutschen Länder" — <https://de.wikipedia.org/wiki/Liste_der_h%C3%B6chsten_Berge_der_deutschen_L%C3%A4nder>, revision of 2025-01-24, read 2026-09-29. Individual heights cite the Landesvermessung / BfN; see the article's references |
-| **Values** | Metres über NHN, **rounded to whole metres** for display (as `countries.json`) |
+| **Values** | Metres über NHN, **rounded to whole metres** for display (as the world quiz did) |
 
 | Key | Name | Source value | Stored |
 |---|---|---|---|
@@ -395,8 +398,8 @@ both Bremen and Bremerhaven lie inside Niedersachsen), Hamburg 2 (NI, SH).
 **Blocking the current spec (§2, §5):** none open.
 
 1. ~~Eurostat GISCO attribution text has not been written.~~ **Closed** — written in §2
-   ("Attribution"). The game still has to *show* it (and the Destatis credit, §7); that
-   is UI work for the implementing ticket, not a data gap.
+   ("Attribution"). The app shows it, and the Destatis credit (§7), behind the (i)
+   button above the bottom panels (`#btn-credits` in `index.html`); see gap 5.
 2. ~~The NUTS-1 → ISO 3166-2 mapping is written from the published classification.~~
    **Closed** — verified against the fetched file's `NUTS_ID`/`NAME_LATN` (§2).
 
@@ -407,3 +410,32 @@ both Bremen and Bremerhaven lie inside Niedersachsen), Hamburg 2 (NI, SH).
    OSM attribution.
 4. **The Natural Earth rejection (§3) should be written up as an ADR** in this repo if the
    fifth mode proceeds, so it is not silently revisited.
+
+**Found while retiring the world artifacts (2026-09-30), both resolved by the maintainer:**
+
+5. ~~**The corner credits are covered by the bottom panels on narrower screens.**~~
+   **Resolved** — the always-visible corner block was replaced by an (i) button
+   (`#btn-credits`, `aria-label="Quellenangaben"`). With the info panel open, the old
+   corner block had been partly or fully covered below about 1,400px (e.g. 53% of the
+   Destatis line at 1000px, 98% at 400px), which is exactly when Einwohner and Fläche are
+   shown. The (i) is the first item in the bottom panel stack, so it always sits just above
+   whichever bottom panel is open. It was measured uncovered and tappable in every phase of
+   every mode at 1440×900, 1000×800, 400×800 and 320×640. It hides behind the menu,
+   Einstellungen and Spiel beendet overlays, which cover the whole map. Hovering the
+   button (mouse), focusing it by keyboard, or tapping it (toggle; a tap elsewhere closes
+   it) shows both notices verbatim: the §2 EuroGeographics notice and the §7 Destatis
+   credit. GISCO asks for a copyright notice that is *visible* on any electronic
+   publication using the data. A compact (i) attribution is common practice for web maps
+   (e.g. Leaflet's and Mapbox's compact attribution controls), but whether it satisfies
+   "visible" is a judgement call, made here by the maintainer.
+6. ~~**`LICENSE` (CC BY-NC 4.0, © Krautlabs Inc.) does not exclude the third-party data.**~~
+   **Resolved** — `LICENSE` now has a "Third-party material" section after the unchanged
+   CC BY-NC text. It says the geometry and the Bundesland facts in `data/`, and the
+   Landeswappen in `wappen/`, stay under their sources' terms as documented here:
+   - Eurostat GISCO / EuroGeographics: non-commercial, with attribution
+   - Destatis: reproduction with attribution
+   - Landeswappen: Public Domain, subject to the Wappengesetz
+
+   None of these is licensed under CC BY-NC by Krautlabs Inc.
+   `data/bundesland-aliases.json` is the maintainer's own work and is covered by
+   CC BY-NC. Gap 3 (ODbL, fifth mode) will need an entry in the same section.

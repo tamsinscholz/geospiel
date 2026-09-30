@@ -20,12 +20,6 @@
   <!-- SVG Map -->
   <svg id="map" preserveAspectRatio="xMidYMid meet"><g id="map-group"><g id="kulisse-group"></g><g id="bundesland-group"></g><g id="hit-group"></g></g></svg>
 
-  <!-- Data credits (required by SOURCES.md §2 and §7) -->
-  <div id="map-credits">
-    <div>Kartengrundlage: &copy; EuroGeographics bezüglich der Verwaltungsgrenzen</div>
-    <div>Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024</div>
-  </div>
-
   <!-- Explore Quit Button -->
   <button id="btn-menu" class="btn btn-danger btn-sm">Beenden</button>
 
@@ -50,6 +44,17 @@
 
   <!-- Bottom Panel Stack -->
   <div class="bottom-panels">
+    <!-- Data credits (required by SOURCES.md §2 and §7) behind an (i) button.
+         First in the stack, so it always sits just above whichever bottom
+         panel is open and never overlaps one. CSS shows the popover. -->
+    <div id="credits" class="credits">
+      <button id="btn-credits" class="credits-btn" type="button"
+              aria-label="Quellenangaben" aria-expanded="false" aria-controls="credits-popover">i</button>
+      <div id="credits-popover" class="credits-popover" role="note">
+        <div>Kartengrundlage: &copy; EuroGeographics bezüglich der Verwaltungsgrenzen</div>
+        <div>Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024</div>
+      </div>
+    </div>
     <!-- Feedback Bar -->
     <div id="feedback-bar" class="panel feedback-bar">
       <span id="feedback-text"></span>
@@ -110,7 +115,7 @@
           <span class="mode-desc">Die Landeshauptstadt des Bundeslandes eingeben</span>
         </button>
       </div>
-      <div class="overlay-footer"><a href="https://github.com/jan-scholz/world-game" target="_blank" rel="noopener"><svg class="gh-icon"><use href="#icon-github"/></svg> Quellcode auf GitHub</a> · &copy; 2026 Krautlabs Inc.</div>
+      <div class="overlay-footer"><a href="https://github.com/jan-scholz/geospiel" target="_blank" rel="noopener"><svg class="gh-icon"><use href="#icon-github"/></svg> Quellcode auf GitHub</a> · &copy; 2026 Krautlabs Inc.</div>
     </div>
   </div>
 

@@ -10,8 +10,8 @@
  *
  * `items` is deliberately generic: a plain object keyed by item id, each value
  * carrying at least a `name` and (for capital mode) a `capital`. It is not
- * named after countries or Bundeslaender because the data behind it is swapped
- * out in later tickets.
+ * named after Bundeslaender so that other item sets (e.g. rivers or cities for
+ * a later mode) can go through the same rules.
  */
 
 /* === Phases === */
@@ -222,9 +222,14 @@ export function createGame({
       return advance();
     },
 
-    /** Count the round as skipped and advance; never enters feedback. */
+    /**
+     * Count the round as skipped and advance; never enters feedback. Only a
+     * round still being played can be skipped: in feedback the round is
+     * already answered, so a skip there changes nothing.
+     */
     skip() {
       if (s.phase === FINISHED) return { phase: s.phase, finished: true };
+      if (s.phase !== PLAYING) return { phase: s.phase, finished: false, ignored: true };
       s.skipped++;
       return advance();
     },

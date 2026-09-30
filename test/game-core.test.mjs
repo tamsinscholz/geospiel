@@ -10,9 +10,9 @@ import {
 
 /* === Fixtures ===
  *
- * Small and synthetic on purpose: the real data is swapped out in a later
- * ticket, and these tests must stay valid when it is. Ids are opaque strings,
- * as they are for the module.
+ * Small and synthetic on purpose: the rules must hold for any item set, not
+ * just the real Bundesländer (those are exercised in aliases.test.mjs and
+ * capitals.test.mjs). Ids are opaque strings, as they are for the module.
  */
 
 const items = {
@@ -218,6 +218,21 @@ test('skipping counts a skip, leaves the score untouched and does not enter feed
   assert.strictEqual(game.state.score, 0);
   assert.strictEqual(game.state.currentRound, 1);
   assert.strictEqual(game.state.targetId, 'A2');
+});
+
+test('skipping during feedback changes nothing: the answered round is not also counted as skipped', () => {
+  const game = newGame({ totalRounds: 2 });
+  game.guessById('A1'); // correct, now in feedback
+
+  assert.deepStrictEqual(game.skip(), { phase: 'feedback', finished: false, ignored: true });
+  assert.strictEqual(game.state.skipped, 0);
+  assert.strictEqual(game.state.currentRound, 0);
+  assert.strictEqual(game.state.targetId, 'A1');
+  assert.strictEqual(game.state.phase, 'feedback');
+
+  game.next();
+  game.quit();
+  assert.deepStrictEqual(game.summary(), { roundsPlayed: 2, correct: 1, skipped: 0, percent: 50 });
 });
 
 test('skipping the last round finishes the game', () => {

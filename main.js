@@ -545,8 +545,11 @@ import { createGame } from './game-core.mjs';
   }
 
   function skipRound() {
+    const result = game.skip();
+    // Outside a round in play (feedback) a skip is a no-op in the core
+    if (result.ignored) return;
     clearAdvanceTimer();
-    if (game.skip().finished) {
+    if (result.finished) {
       showStats();
     } else {
       startRound();
@@ -670,6 +673,22 @@ import { createGame } from './game-core.mjs';
 
     // Stats screen
     $('btn-back-menu').addEventListener('click', returnToMenu);
+
+    // Credits (i): a click toggles, a pointer-down anywhere else closes. CSS
+    // shows the popover off aria-expanded. The button is outside the SVG, so
+    // its clicks never reach the map's handlers.
+    const btnCredits = $('btn-credits');
+    // Suppress the tap's compatibility mousedown/mouseup. In Erkunden the
+    // tap's mouseleave closes the info panel and the button, stacked above
+    // it, drops down mid-tap; without this the click then lands on the map.
+    btnCredits.addEventListener('pointerdown', (e) => e.preventDefault());
+    btnCredits.addEventListener('click', () => {
+      const open = btnCredits.getAttribute('aria-expanded') === 'true';
+      btnCredits.setAttribute('aria-expanded', String(!open));
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (!btnCredits.contains(e.target)) btnCredits.setAttribute('aria-expanded', 'false');
+    });
   }
 
   /* === Init === */

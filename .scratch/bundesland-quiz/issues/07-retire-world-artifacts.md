@@ -19,18 +19,18 @@ Reference: `.scratch/bundesland-quiz/spec.md`, `SOURCES.md`.
 
 **Blocked by:** 04, 05, 06.
 
-**Status:** ready-for-agent
+**Status:** done — landed with commit "Retire the world quiz artifacts and document the Germany game"
 
 ### Acceptance criteria
 
-- [ ] `countries.json`, `aliases.json`, `small_targets.json` and `create_small_target_map.py` are deleted
-- [ ] No reference to any deleted file, to the world-atlas CDN fetch, or to flagcdn.com remains anywhere in the code or docs
-- [ ] `README.md` describes the German game: what it is, the quickstart, the four modes, and a pointer to `SOURCES.md` for data provenance and licensing rather than restating it
-- [ ] `README.md` no longer claims a small-country click-target overlay or a regeneration script
-- [ ] `docs/game-flow.md` is rewritten for the four German modes, with the German strings the app actually shows, the 1–16 Runden range, the gentle zoom, and the corrected state-machine summary
-- [ ] `docs/ui-components.md` is updated for the Landeswappen box, the Kulisse layer, the viewBox and pan clamp, the scale range, and the German labels
-- [ ] The repo `CLAUDE.md` is updated: file inventory, the four modes, the data flow, ISO 3166-2 keying, the projection and pan clamp, and `make` as the preferred entry point
-- [ ] Attribution required by `SOURCES.md` is actually present in the app — Eurostat for the geometry, and Destatis wherever population figures are shown
-- [ ] The `LICENSE` file is consistent with what is now shipped, or the discrepancy is recorded if it needs a decision
-- [ ] `make test` passes and the app still plays through all four modes
-- [ ] **Verified by driving the app, not by self-report:** confirm nothing broke from the deletions — report a full round played in each of the four modes
+- [x] `countries.json`, `aliases.json`, `small_targets.json` and `create_small_target_map.py` are deleted
+- [x] No reference to any deleted file, to the world-atlas CDN fetch, or to flagcdn.com remains anywhere in the code or docs
+- [x] `README.md` describes the German game: what it is, the quickstart, the four modes, and a pointer to `SOURCES.md` for data provenance and licensing rather than restating it
+- [x] `README.md` no longer claims a small-country click-target overlay or a regeneration script
+- [x] `docs/game-flow.md` is rewritten for the four German modes, with the German strings the app actually shows, the 1–16 Runden range, the gentle zoom, and the corrected state-machine summary
+- [x] `docs/ui-components.md` is updated for the Landeswappen box, the Kulisse layer, the viewBox and pan clamp, the scale range, and the German labels
+- [x] The repo `CLAUDE.md` is updated: file inventory, the four modes, the data flow, ISO 3166-2 keying, the projection and pan clamp, and `make` as the preferred entry point
+- [x] Attribution required by `SOURCES.md` is actually present in the app — Eurostat for the geometry, and Destatis wherever population figures are shown
+- [x] The `LICENSE` file is consistent with what is now shipped, or the discrepancy is recorded if it needs a decision
+- [x] `make test` passes and the app still plays through all four modes
+- [x] **Verified by driving the app, not by self-report:** confirm nothing broke from the deletions — report a full round played in each of the four modes

@@ -16,3 +16,24 @@ Under the following terms:
   - NonCommercial — You may not use the material for commercial purposes.
   - No additional restrictions — You may not apply legal terms or technological
     measures that legally restrict others from doing anything the license permits.
+
+--------------------------------------------------------------------------------
+
+Third-party material
+
+The following are not the work of Krautlabs Inc. and are NOT licensed under
+CC BY-NC 4.0 by Krautlabs Inc. They remain under their sources' own terms, as
+documented in SOURCES.md:
+
+  - data/bundeslaender.topo.json, data/kulisse.topo.json (geometry):
+    Eurostat GISCO / (c) EuroGeographics -- non-commercial use only, with the
+    attribution "(c) EuroGeographics bezüglich der Verwaltungsgrenzen".
+  - data/bundeslaender.json (the Bundesland facts; population and area from
+    Statistisches Bundesamt (Destatis)) -- reproduction and distribution
+    permitted with attribution.
+  - wappen/ (the Landeswappen): Public Domain, subject to the insignia law
+    (Wappengesetz) of each Bundesland, which restricts their use independently
+    of copyright.
+
+data/bundesland-aliases.json is the work of Krautlabs Inc. and is covered by
+the CC BY-NC 4.0 licence above.

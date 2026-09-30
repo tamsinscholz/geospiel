@@ -1,206 +1,275 @@
 # Game Flow
 
-Detailed breakdown of user actions and information displayed at each stage.
+What the user does and what the app shows at each stage. All user-visible text is German;
+strings are quoted exactly as the app shows them (`index.html`, `main.js`).
 
 ---
 
-## 1. Mode Selection Screen
+## 0. The map (every stage)
+
+- Germany divided into its sixteen Bundesländer, fitted to the viewport and centred at any
+  window size. Resizing re-fits it with no JS resize handler (fixed SVG `viewBox`).
+- Around it, the **Kulisse**: the neighbouring countries in a muted fill. It is scenery
+  only and never highlights, never counts as a click, and is never an answer.
+- Pan and zoom by drag, scroll wheel or pinch, in every mode. The scale range is 1×–6×,
+  where 1× is the full-Germany view. Panning is clamped to Germany plus a thin margin, so
+  at 1× the map cannot move at all.
+- **Credits:** a small (i) button ("Quellenangaben") at the left edge of the bottom
+  panels, just above whichever one is open. Hovering it (mouse), focusing it (keyboard)
+  or tapping it shows "Kartengrundlage: © EuroGeographics bezüglich der
+  Verwaltungsgrenzen" and "Einwohner und Fläche: Statistisches Bundesamt (Destatis),
+  Gemeindeverzeichnis, Stand 31.12.2024". Tapping it again, or anywhere else, closes it.
+  Pressing it never counts as a map click.
+- **Touch halo:** on touch or narrow screens (`(pointer: coarse), (max-width: 600px)`),
+  the three Bundesländer under 1,000 km² (Berlin, Bremen, Hamburg) also catch taps up to
+  about 10 screen px outside their outline. A tap there counts as a tap on that
+  Stadtstaat in every mode. With a mouse on a wide screen the halo is inactive.
+
+---
+
+## 1. Menu (`data-screen="select"`)
 
 **What the user sees:**
-- Full-screen overlay with title "World Map Quiz"
-- Four mode cards in a 2×2 grid (single column on mobile):
+- Full-screen overlay titled "Deutschland-Quiz" (also the page title), with the map
+  behind it.
+- Four mode cards in a 2×2 grid (one column at ≤600px):
 
-| Card | Icon | Label | Description |
-|---|---|---|---|
-| Explore | 🌍 | Explore | "Browse the map and discover facts" |
-| Find | 🔍 | Find the Country | "Click the correct country on the map" |
-| Name Country | ✏️ | Name the Country | "Type the name of the highlighted country" |
-| Name Capital | 🏛️ | Name the Capital | "Type the capital of the shown country" |
+| Card | Icon | Label | Description | `data-mode` |
+|---|---|---|---|---|
+| Explore | 🗺️ | Erkunden | "Karte erkunden und Fakten entdecken" | `explore` |
+| Find | 🔍 | Bundesland finden | "Das richtige Bundesland auf der Karte anklicken" | `find` |
+| Name | ✏️ | Bundesland benennen | "Den Namen des markierten Bundeslandes eingeben" | `name-bundesland` |
+| Capital | 🏛️ | Landeshauptstadt benennen | "Die Landeshauptstadt des Bundeslandes eingeben" | `name-capital` |
+
+- Footer: "Quellcode auf GitHub" (links to `https://github.com/jan-scholz/geospiel`) ·
+  "© 2026 Krautlabs Inc."
 
 **User actions:**
-- Click **Explore** → overlays close, map becomes interactive, "Quit" button appears top-right
-- Click any quiz mode → proceeds to Settings Screen
+- **Erkunden**: the overlay closes and Erkunden starts.
+- Any quiz mode: opens the Einstellungen screen for it.
 
 ---
 
-## 2. Explore Mode
+## 2. Erkunden (`data-mode="explore"`, `data-phase="idle"`, no screen)
 
 **What the user sees:**
-- Full interactive world map (pan & zoom enabled)
-- "Quit" button fixed top-right
+- The interactive map, and a "Beenden" button fixed top-right.
 
 **User actions:**
-- **Hover a country (desktop)** → country path turns orange (`.highlighted`), bottom info panel slides in showing:
-  - Flag image (from flagcdn.com)
-  - Country name
-  - Capital city
-  - Facts grid: Area (km²), Population, Highest Point (elevation m), Neighbours (count)
-- **Mouse out (desktop)** → highlight removed, info panel hides
-- **Tap a country (mobile/touch)** → same highlight and info panel as hover. Tapping a different country switches to it. Tapping the same country or empty area dismisses the panel.
-- **Pan/zoom** → scroll wheel or drag to navigate (1×–12× scale)
-- **Click "Quit"** → returns to Mode Selection Screen, map zoom resets
+- **Hover a Bundesland (mouse):** it turns orange (`.highlighted`) and the info panel
+  appears at the bottom with:
+  - the Landeswappen
+  - the name, and "Landeshauptstadt" with the capital
+  - facts: "Fläche" (km², e.g. "21.116 km²"), "Einwohner" (e.g. "6.280.793"),
+    "Höchster Punkt" (e.g. "Wasserkuppe (950 m)"), "Nachbarländer" (the number of
+    other Bundesländer it borders)
+  - Numbers use `de-DE` formatting.
+- **Mouse leaves the Bundesland:** the highlight and the panel go away.
+- **Tap a Bundesland (touch):** same highlight and panel. Tapping a different Bundesland
+  switches to it. Tapping the same one again, or anything that is not a Bundesland (sea,
+  letterbox, Kulisse), dismisses it.
+- **Beenden:** back to the menu. The zoom resets (300 ms).
 
 ---
 
-## 3. Settings Screen (Quiz Modes Only)
+## 3. Einstellungen (`data-screen="settings"`, quiz modes only)
 
 **What the user sees:**
-- Overlay card titled with the chosen mode name (e.g. "Find the Country")
-- Three configurable settings:
+- An overlay card titled with the mode's name ("Bundesland finden",
+  "Bundesland benennen" or "Landeshauptstadt benennen").
 
 | Setting | Control | Range | Default |
 |---|---|---|---|
-| Rounds | Stepper (−/+) | 1–50 | 10 |
-| Guesses per round | Stepper (−/+) | 1–10 | 3 |
-| Auto-advance | Toggle switch | on/off | off |
+| "Runden" | stepper (−/+) | 1–16 | 16 |
+| "Versuche pro Runde" | stepper (−/+) | 1–10 | 3 |
+| "Automatisch weiter" | toggle | on/off | off |
 
-- "Back" button (returns to Mode Selection)
-- "Start Game" button
+- Buttons "Zurück" and "Spiel starten".
+
+The values are remembered while the page is open: they are saved when a game starts and
+shown again the next time this screen opens, for any mode.
 
 **User actions:**
-- Adjust rounds/guesses with stepper buttons
-- Toggle auto-advance (when on, rounds advance automatically after 1.8s feedback delay)
-- Click **Back** → return to Mode Selection
-- Click **Start Game** → overlays close, game begins
+- **Zurück:** back to the menu.
+- **Spiel starten:** the overlay closes and round 1 begins. The rounds are that many
+  Bundesländer in random order, none repeated. The count is clamped to the Bundesländer
+  that have both geometry and metadata, which is all 16.
 
 ---
 
-## 4. Quiz Gameplay — Find the Country
+## 4. Playing: shared parts (`data-phase="playing"`)
 
-**Round start — what the user sees:**
-- **Top game panel** showing:
-  - Target country's flag
-  - Target country's name
-  - Score counter
-  - Guesses remaining counter
-  - Progress bar along bottom edge of panel (fills left-to-right as rounds complete)
-  - "Skip" button
-  - "Quit" button
-- Map at default zoom (no zoom-to-target, no highlight — that would reveal the answer)
+**Game panel (top):**
+- The Landeswappen (not in Landeshauptstadt benennen, and never at ≤600px)
+- The prompt: the Bundesland's name (hidden in Bundesland benennen)
+- "Punkte: n" and "Versuche: n" (the Versuche left in this round)
+- Buttons "Überspringen" (only while the round is being played) and "Beenden"
+- A thin progress bar along the bottom edge. At the start of a round it stands at
+  rounds completed ÷ total; it moves up one step when the round reaches feedback.
 
-**User actions:**
-- **Click a country on the map:**
-  - **Correct** → score increments, transitions to Feedback phase
-  - **Wrong** → guesses decrement, clicked country flashes red for 600ms (`.wrong-guess`)
-  - **Last wrong guess** → transitions to Feedback phase (incorrect)
-- **Click "Skip"** → skipped count increments, advances to next round (no feedback shown)
-- **Click "Quit"** → immediately goes to Stats Screen
+**Zoom at round start:**
+- **Bundesland finden, Bundesland benennen:** the map stays on the full-Germany
+  overview. If the user has zoomed in, it returns to the overview (300 ms); at 1× nothing
+  moves.
+- **Landeshauptstadt benennen:** gentle zoom to the target (750 ms). The scale fits the
+  Bundesland but is capped at 1.8×, so a small Bundesland still shows most of Germany
+  around it. The pan clamp applies to this too.
 
----
-
-## 5. Quiz Gameplay — Name the Country
-
-**Round start — what the user sees:**
-- **Top game panel** showing:
-  - Target country's flag
-  - Country name is **hidden** (that's the answer)
-  - Score counter, guesses remaining, progress bar, Skip, Quit
-- Map **zooms to the target country** (750ms animation)
-- Target country highlighted in blue (`.target`)
-- **Bottom input panel** with:
-  - Text input (placeholder: "Name the country…")
-  - "Submit" button
-  - Input auto-focuses after 800ms (waits for zoom animation)
-
-**User actions:**
-- **Type answer + press Enter or click Submit:**
-  - Input is normalized (trimmed, lowercased, diacritics removed) and looked up in `aliases.json`
-  - **Correct** → score increments, transitions to Feedback phase
-  - **Wrong, guesses remaining** → red inline message "Wrong — N guess(es) left", input clears, re-focuses
-  - **Wrong, no guesses left** → transitions to Feedback phase (incorrect)
-- **Click "Skip"** → skipped count increments, advances to next round
-- **Click "Quit"** → immediately goes to Stats Screen
+**User actions available in every quiz mode:**
+- **Überspringen** (playing only): counts the round as skipped and goes straight to the
+  next round (no feedback), or to the Spiel beendet screen after the last one. In
+  feedback the round is already answered: the button is hidden, and `game.skip()` is a
+  no-op there anyway (it returns `{ phase: 'feedback', finished: false, ignored: true }`).
+- **Beenden:** ends the game right away and opens Spiel beendet. The round in progress
+  counts as played.
 
 ---
 
-## 6. Quiz Gameplay — Name the Capital
+## 5. Bundesland finden (`data-mode="find"`)
 
-**Round start — what the user sees:**
-- **Top game panel** showing:
-  - Flag is **hidden** (flag area collapsed)
-  - Target country's **name shown** (the prompt)
-  - Score counter, guesses remaining, progress bar, Skip, Quit
-- Map **zooms to the target country** (750ms animation)
-- Target country highlighted in blue (`.target`)
-- **Bottom input panel** with:
-  - Text input (placeholder: "Name the capital…")
-  - "Submit" button
-  - Input auto-focuses after 800ms
+**Round start:** the game panel shows the target's Landeswappen and name. Nothing on the
+map is highlighted, and there is no input panel.
 
 **User actions:**
-- **Type answer + press Enter or click Submit:**
-  - Input is normalized and compared directly against `countries.json` capital field
-  - **Correct** → score increments, transitions to Feedback phase
-  - **Wrong, guesses remaining** → red inline message "Wrong — N guess(es) left", input clears, re-focuses
-  - **Wrong, no guesses left** → transitions to Feedback phase (incorrect)
-- **Click "Skip"** → skipped count increments, advances to next round
-- **Click "Quit"** → immediately goes to Stats Screen
+- **Click the right Bundesland:** +1 Punkt, then feedback ("Richtig!").
+- **Click a wrong Bundesland:** −1 Versuch, and the clicked Bundesland flashes red for
+  600 ms (`.wrong-guess`). The round continues. Clicking the same wrong one again costs
+  another Versuch.
+- **Last Versuch used up:** feedback ("Keine Versuche mehr – es war {Name}").
+- **Click the Kulisse or the sea:** nothing happens and no Versuch is used.
 
 ---
 
-## 7. Feedback Phase (All Quiz Modes)
+## 6. Bundesland benennen (`data-mode="name-bundesland"`)
+
+**Round start:**
+- The game panel shows the Landeswappen. The name is hidden (`visibility: hidden`) until
+  feedback.
+- The target is highlighted in blue on the map (`.target`), on the overview.
+- The input panel appears: a text field with the placeholder "Bundesland eingeben …" and
+  the "Antworten" button. The field gets focus after 800 ms.
+
+**User actions (Enter or "Antworten"):**
+- Input and answers are compared after `normalize()`: case, spaces, hyphens and
+  punctuation are ignored, `ß`→`ss`, umlauts can be typed as `ü`, `ue` or `u`. The
+  typed name is looked up in `data/bundesland-aliases.json`, which has the plain names,
+  official long forms ("Freistaat Bayern"), abbreviations ("NRW", "MV", "BaWü") and
+  English names ("Bavaria"). "Sachsen" and "Sachsen-Anhalt" stay distinct.
+- **Correct:** +1 Punkt, then feedback, which always shows the German name.
+- **Wrong, Versuche left:** red inline message "Falsch – noch 2 Versuche" (singular:
+  "Falsch – noch 1 Versuch"). The field is cleared and focused again.
+- **Wrong, none left:** feedback ("Keine Versuche mehr – es war {Name}").
+- **Empty or whitespace-only input:** ignored, no Versuch used.
+
+---
+
+## 7. Landeshauptstadt benennen (`data-mode="name-capital"`)
+
+**Round start:**
+- The game panel shows the Bundesland's name as the prompt. The Landeswappen is hidden.
+- The target is highlighted in blue and the map zooms gently to it (section 4).
+- The input panel appears with the placeholder "Landeshauptstadt eingeben …" and
+  "Antworten". The field gets focus after 800 ms, once the zoom has finished.
+
+**User actions:** as in Bundesland benennen, except that the answer is compared (after
+`normalize()`) with that Bundesland's `capital` and its optional `capital_variants`
+(e.g. "Munich", "Hanover"). Another Bundesland's capital is wrong. The failure message is
+"Keine Versuche mehr – es war {Landeshauptstadt}".
+
+---
+
+## 8. Feedback (`data-phase="feedback"`, all quiz modes)
 
 **What the user sees:**
-- Input panel hides
-- **Feedback bar** appears above country info panel:
-  - Correct: green text "Correct!"
-  - Wrong: red text "No more guesses — the answer was {answer}"
-    - For Name Capital: answer = capital name
-    - For Find/Name Country: answer = country name
-- **Country info panel** shows full details (flag, name, capital, area, population, highest point, neighbours)
-- Target country highlighted on map (`.target`) and zoomed to — in all modes including Find, so the user sees the country's location
+- The input panel is gone. In Bundesland benennen the name appears in the game panel.
+- **Feedback bar** above the info panel:
+  - correct: green "Richtig!"
+  - out of Versuche: red "Keine Versuche mehr – es war {Antwort}". The answer is the
+    Landeshauptstadt in Landeshauptstadt benennen and the Bundesland's name otherwise.
+- **Info panel** with the full facts (as in Erkunden).
+- The target is highlighted (`.target`) in every mode, including Bundesland finden.
+- **Zoom:** only Landeshauptstadt benennen re-centres on the target (750 ms, capped at
+  1.8×). Bundesland finden and Bundesland benennen stay where they are, which is the
+  overview unless the user has zoomed in.
 
-**User actions (auto-advance OFF):**
-- **"Next →" button** appears in feedback bar → click to advance to next round
-- Button auto-focuses for keyboard accessibility
+**Automatisch weiter off:** a "Weiter →" button in the feedback bar, focused after
+100 ms (Enter or Space advances).
 
-**Behavior (auto-advance ON):**
-- No user action needed — automatically advances after 1.8 seconds
-- **"Next →" button** is omitted from feedback bar
+**Automatisch weiter on:** there is no "Weiter →" button (hidden by CSS off
+`data-auto-advance="on"`), and the next round starts after 1.8 s.
 
-**End of rounds:** after the last round's feedback, transitions to Stats Screen instead of next round.
+After the last round, the next step is Spiel beendet instead of a new round.
 
 ---
 
-## 8. Stats Screen (Game Over)
+## 9. Spiel beendet (`data-screen="stats"`)
 
 **What the user sees:**
-- Full-screen overlay titled "Game Over"
-- Stats summary:
+- Overlay titled "Spiel beendet":
 
-| Stat | Value |
+| Row | Value |
 |---|---|
-| Rounds played | Total rounds attempted |
-| Correct | Number answered correctly |
-| Skipped | Number skipped |
-| Score | Correct / Rounds played as percentage |
+| "Gespielte Runden" | rounds played (a round in progress when "Beenden" was pressed counts) |
+| "Richtig" | rounds answered correctly |
+| "Übersprungen" | rounds skipped |
+| "Punktzahl" | Richtig ÷ Gespielte Runden, as % |
+| "Durchschnitt der letzten {n} Runden" | the correct ÷ rounds over the stored earlier games of this mode (singular: "Durchschnitt der letzten Runde"). Hovering it shows "Punktzahl in %: …" with the scores of up to the last 8 stored games. The row is hidden when there is no earlier game |
 
-- "Back to Menu" button (full-width)
-- Map zoom resets in background (300ms)
+- "Zurück zum Menü" (full width).
+- Behind the overlay the map classes clear and the zoom resets (300 ms).
+
+**Score history:** after the screen is filled, the game just finished is saved to
+`localStorage` under `geospiel-stats-<mode>` (`geospiel-stats-find`,
+`geospiel-stats-name-bundesland`, `geospiel-stats-name-capital`) as
+`{ rounds, correct, skipped }`, keeping the last 10 games. The average therefore covers
+the earlier games, not the one just played. The `geospiel-` prefix keeps the world quiz's
+old `stats-<mode>` keys, which could exist on the same development origin, out of the
+average.
 
 **User actions:**
-- Click **Back to Menu** → returns to Mode Selection Screen
+- **Zurück zum Menü:** back to the menu.
 
 ---
 
-## State Machine Summary
+## State machine
 
 ```
-Mode Selection ──→ Explore ──→ (Quit) ──→ Mode Selection
-       │
-       ├──→ Settings ──→ Start Game ──→ Playing ──→ Feedback ──→ Playing ...
-       │        │                          │            │
-       │        └── Back ──→ Mode Selection │            └── (last round) ──→ Stats
-       │                                   │
-       │                                   ├── Skip ──→ Playing / Stats
-       │                                   └── Quit ──→ Stats
-       │
-       └── Stats ──→ (Back to Menu) ──→ Mode Selection
+Menu ──Erkunden──→ Erkunden ──Beenden──→ Menu
+ │
+ └─quiz mode─→ Einstellungen ──Zurück──→ Menu
+                    │
+               Spiel starten
+                    ↓
+ ┌──────────→ Playing ──right answer / last Versuch used──→ Feedback
+ │              │                                            │
+ │         Überspringen                     Weiter → / Automatisch
+ │              │                           weiter (after 1.8 s)
+ │              ↓                                            │
+ └─ yes ── more rounds? ←────────────────────────────────────┘
+                │ no
+                ↓
+          Spiel beendet ←── Beenden (from Playing or Feedback)
+                │
+  Zurück zum Menü ──→ Menu
 ```
 
-**Data attributes on `<body>` (drive CSS visibility):**
-- `data-phase`: `idle` | `playing` | `feedback`
-- `data-mode`: `explore` | `find` | `name-country` | `name-capital`
-- `data-screen`: `select` | `settings` | `stats` | (absent — no overlay)
+The game panel stays visible during feedback, so Beenden works from Feedback as well as
+from Playing. Überspringen is hidden in feedback and only exists in Playing.
 
-JS sets these attributes on state transitions. CSS attribute selectors determine which panels, overlays, and buttons are visible — no manual per-element show/hide calls needed.
+**Data attributes on `<body>` (CSS decides visibility from these):**
+
+| Attribute | Values | Set by |
+|---|---|---|
+| `data-phase` | `idle` (menu, Einstellungen, Erkunden, Spiel beendet) · `playing` · `feedback` | `setPhase()` |
+| `data-mode` | `explore` · `find` · `name-bundesland` · `name-capital` | `setMode()`, when Erkunden or a game starts. Opening Einstellungen does not change it, and it keeps its last value on the menu |
+| `data-screen` | `select` · `settings` · `stats` · absent (no overlay: Erkunden and a game in progress) | `setScreen()` |
+| `data-auto-advance` | `on` · `off` | `startGame()`, for the whole game |
+
+`game-core.mjs` has its own phases (`playing`, `feedback`, `finished`). `main.js`
+mirrors the first two to `data-phase`, and on `finished` it shows Spiel beendet with
+`data-phase="idle"`.
+
+JS only sets these attributes and fills in text. CSS attribute selectors decide which
+panels, overlays and buttons are visible, and there are no per-element show/hide calls.
+Two exceptions are toggled directly: the Erkunden info panel (class `visible`, on
+hover/tap) and the average row on Spiel beendet (`style.display`).
