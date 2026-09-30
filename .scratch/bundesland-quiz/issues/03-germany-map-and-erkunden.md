@@ -59,5 +59,6 @@ concurrently means a painful merge.*
 - [ ] The Erkunden quit button returns to the menu and resets the zoom to the full-Germany view
 - [ ] The mode selection screen and every Erkunden string are in German, and the page declares `lang="de"`
 - [ ] The small-target overlay is no longer rendered and its CSS is gone
+- [ ] The data credits required by `SOURCES.md` are visible whenever the map is shown: `Kartengrundlage: © EuroGeographics bezüglich der Verwaltungsgrenzen` (§2) and `Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024` (§7) — small, muted, unobtrusive (e.g. a corner of the map), and never covering a Bundesland or intercepting clicks. *Added 2026-09-30: this is the first ticket that shows the map and the population figures, and no other ticket owned the credits.*
 - [ ] `make test` passes
 - [ ] **Verified by driving the app, not by self-report:** report observed values for the fitted extent at both widths, the pan clamp at `k = 1` and at maximum zoom, a resize, and a Kulisse click
