@@ -39,8 +39,28 @@ import { createGame } from './game-core.mjs';
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 6;
 
+  /** The gentle zoom's scale cap. Small Bundesländer hit it; at 1.8 the full
+   *  east-west span and over half the north-south span of Germany stay in
+   *  frame, so the target's position in the country stays readable. The one
+   *  knob to tune after playing. */
+  const TARGET_ZOOM_MAX = 1.8;
+
+  /** Bundesländer smaller than this get an invisible touch halo (`.hit-target`)
+   *  — in practice the three Stadtstaaten. CSS decides when the halo is live. */
+  const SMALL_TARGET_MAX_AREA_KM2 = 1000;
+
   /** Padding around Germany's projected bounds, in viewBox units. */
   const MAP_PADDING = 20;
+
+  /** Settings ranges. Runden caps at the sixteen Bundesländer. */
+  const ROUNDS_MAX = 16;
+  const GUESSES_MAX = 10;
+
+  /** Per-mode score history lives under `geospiel-stats-<mode>`. The prefix
+   *  keeps the world quiz's unprefixed `stats-<mode>` keys, served from the
+   *  same dev origin, out of the average. */
+  const HISTORY_KEY_PREFIX = 'geospiel-stats-';
+  const HISTORY_LENGTH = 10;
 
   /* === Game State ===
    *
@@ -54,7 +74,7 @@ import { createGame } from './game-core.mjs';
     mode: null,
     phase: 'idle',
     screen: 'select',
-    totalRounds: 10,
+    totalRounds: ROUNDS_MAX,
     maxGuesses: 3,
     autoAdvance: false,
     advanceTimer: null,
@@ -113,6 +133,11 @@ import { createGame } from './game-core.mjs';
     return numberFormat.format(n);
   }
 
+  /** "1 Versuch" / "3 Versuche" — German number agreement, never "1 Versuche". */
+  function versucheText(n) {
+    return n === 1 ? '1 Versuch' : `${n} Versuche`;
+  }
+
   function clearAdvanceTimer() {
     if (gameState.advanceTimer) {
       clearTimeout(gameState.advanceTimer);
@@ -120,11 +145,22 @@ import { createGame } from './game-core.mjs';
     }
   }
 
+  /** Fill the progress bar for `completed` of the game's rounds. */
+  function renderProgress(completed, total) {
+    progressFill.style.width = (completed / total * 100) + '%';
+  }
+
   function clearMapClasses() {
     d3.selectAll('.bundesland')
       .classed('highlighted', false)
       .classed('target', false)
       .classed('wrong-guess', false);
+  }
+
+  /** The visible Bundesland path for an id. Hits on a `.hit-target` halo are
+   *  resolved through this, so map classes always land on the real shape. */
+  function bundeslandPath(id) {
+    return document.querySelector(`.bundesland[data-id="${id}"]`);
   }
 
   function highlightTarget(id) {
@@ -158,7 +194,7 @@ import { createGame } from './game-core.mjs';
     const dy = y1 - y0;
     const x = (x0 + x1) / 2;
     const y = (y0 + y1) / 2;
-    const scale = Math.min(MAX_ZOOM, 0.9 / Math.max(dx / viewBox.width, dy / viewBox.height));
+    const scale = Math.min(TARGET_ZOOM_MAX, 0.9 / Math.max(dx / viewBox.width, dy / viewBox.height));
     const tx = viewBox.x + viewBox.width / 2 - scale * x;
     const ty = viewBox.y + viewBox.height / 2 - scale * y;
 
@@ -240,6 +276,22 @@ import { createGame } from './game-core.mjs';
       .on('mouseenter', onBundeslandEnter)
       .on('mouseleave', onBundeslandLeave);
 
+    // Touch halos for the small Bundesländer: an invisible duplicate path on
+    // top whose stroke only takes pointer events on touch/narrow screens (CSS).
+    // It shares the real path's handlers, which resolve the id, not the element.
+    d3.select('#hit-group').selectAll('path')
+      .data(geoFeatures.filter(f => {
+        const b = bundeslaenderData[featureId(f)];
+        return b && b.area_km2 < SMALL_TARGET_MAX_AREA_KM2;
+      }))
+      .join('path')
+      .attr('class', 'hit-target')
+      .attr('d', pathGenerator)
+      .attr('data-id', d => featureId(d))
+      .on('click', onBundeslandClick)
+      .on('mouseenter', onBundeslandEnter)
+      .on('mouseleave', onBundeslandLeave);
+
     // The zoom extent defaults to the viewBox; making the translate extent the
     // same rectangle leaves no pan at k = 1 and clamps to Germany plus the
     // padding margin at every higher k.
@@ -255,7 +307,7 @@ import { createGame } from './game-core.mjs';
     // Click anywhere that is not a Bundesland (sea, letterbox, or the Kulisse,
     // which lets clicks through) to dismiss the explore panel
     svg.on('click', (event) => {
-      if (!event.target.closest('.bundesland') && gameState.mode === 'explore') {
+      if (!event.target.closest('.bundesland, .hit-target') && gameState.mode === 'explore') {
         d3.selectAll('.bundesland').classed('highlighted', false);
         countryPanel.classList.remove('visible');
         lastTappedId = null;
@@ -272,25 +324,25 @@ import { createGame } from './game-core.mjs';
     if (gameState.mode !== 'explore') return;
     const id = featureId(d);
     if (!bundeslaenderData[id]) return;
-    d3.select(this).classed('highlighted', true);
+    d3.select(bundeslandPath(id)).classed('highlighted', true);
     fillBundeslandInfo(id);
     countryPanel.classList.add('visible');
   }
 
   function onBundeslandLeave(event, d) {
     if (gameState.mode !== 'explore') return;
-    d3.select(this).classed('highlighted', false);
+    d3.select(bundeslandPath(featureId(d))).classed('highlighted', false);
     countryPanel.classList.remove('visible');
   }
 
-  function handleExploreClick(id, pathEl) {
+  function handleExploreClick(id) {
     if (lastTappedId === id) {
       d3.selectAll('.bundesland').classed('highlighted', false);
       countryPanel.classList.remove('visible');
       lastTappedId = null;
     } else {
       d3.selectAll('.bundesland').classed('highlighted', false);
-      d3.select(pathEl).classed('highlighted', true);
+      d3.select(bundeslandPath(id)).classed('highlighted', true);
       fillBundeslandInfo(id);
       countryPanel.classList.add('visible');
       lastTappedId = id;
@@ -310,14 +362,14 @@ import { createGame } from './game-core.mjs';
 
     if (gameState.mode === 'explore') {
       if (!bundeslaenderData[id]) return;
-      handleExploreClick(id, this);
+      handleExploreClick(id);
     } else if (gameState.mode === 'find' && gameState.phase === 'playing') {
-      handleFindClick(id, this);
+      handleFindClick(id);
     }
   }
 
-  /* === Find the Country === */
-  function handleFindClick(id, pathEl) {
+  /* === Bundesland finden === */
+  function handleFindClick(id) {
     const result = game.guessById(id);
     if (result.ignored) return;
 
@@ -327,6 +379,7 @@ import { createGame } from './game-core.mjs';
     }
 
     hudGuesses.textContent = result.guessesLeft;
+    const pathEl = bundeslandPath(id);
     d3.select(pathEl).classed('wrong-guess', true);
     setTimeout(() => d3.select(pathEl).classed('wrong-guess', false), 600);
 
@@ -349,7 +402,7 @@ import { createGame } from './game-core.mjs';
     if (result.exhausted) {
       showFeedback(false);
     } else {
-      inputFeedback.textContent = `Wrong \u2014 ${result.guessesLeft} guess${result.guessesLeft !== 1 ? 'es' : ''} left`;
+      inputFeedback.textContent = `Falsch \u2013 noch ${versucheText(result.guessesLeft)}`;
       guessInput.value = '';
       guessInput.focus();
     }
@@ -370,6 +423,8 @@ import { createGame } from './game-core.mjs';
     gameState.totalRounds = parseInt(valRounds.textContent);
     gameState.maxGuesses = parseInt(valGuesses.textContent);
     gameState.autoAdvance = chkAuto.checked;
+    // CSS hides Weiter off this attribute; it holds for the whole game
+    body.dataset.autoAdvance = gameState.autoAdvance ? 'on' : 'off';
 
     // Only Bundesländer that have geometry on the map can be a round's target.
     // Which ids have geometry is knowledge that belongs to this side of the
@@ -406,13 +461,17 @@ import { createGame } from './game-core.mjs';
     gamePrompt.textContent = c.name;
     hudScore.textContent = state.score;
     hudGuesses.textContent = state.guessesLeft;
-    progressFill.style.width = (state.currentRound / state.totalRounds * 100) + '%';
+    renderProgress(state.currentRound, state.totalRounds);
 
     guessInput.value = '';
     inputFeedback.textContent = '';
     feedbackBar.classList.remove('feedback-bar--correct', 'feedback-bar--wrong');
 
     setPhase('playing');
+
+    // Bundesland finden starts un-highlighted and un-zoomed, or the map would
+    // give the answer away; undo the previous round's feedback zoom
+    if (gameState.mode === 'find') resetZoom();
 
     if (gameState.mode === 'name-country' || gameState.mode === 'name-capital') {
       highlightTarget(id);
@@ -437,20 +496,21 @@ import { createGame } from './game-core.mjs';
     }
 
     if (correct) {
-      feedbackText.textContent = 'Correct!';
+      feedbackText.textContent = 'Richtig!';
       feedbackBar.classList.add('feedback-bar--correct');
       feedbackBar.classList.remove('feedback-bar--wrong');
     } else {
-      feedbackText.textContent = `Out of guesses: It was ${answer}`;
+      feedbackText.textContent = `Keine Versuche mehr \u2013 es war ${answer}`;
       feedbackBar.classList.add('feedback-bar--wrong');
       feedbackBar.classList.remove('feedback-bar--correct');
     }
 
-    btnNext.style.display = gameState.autoAdvance ? 'none' : '';
     fillBundeslandInfo(id);
     highlightTarget(id);
     zoomToBundesland(id);
     hudScore.textContent = state.score;
+    // The round is complete once it reaches feedback
+    renderProgress(state.currentRound + 1, state.totalRounds);
 
     setPhase('feedback');
 
@@ -490,15 +550,18 @@ import { createGame } from './game-core.mjs';
   }
 
   function getHistory(mode) {
-    try { return JSON.parse(localStorage.getItem('stats-' + mode)) || []; }
-    catch { return []; }
+    try {
+      const hist = JSON.parse(localStorage.getItem(HISTORY_KEY_PREFIX + mode));
+      return Array.isArray(hist) ? hist.filter(h => h && h.rounds > 0) : [];
+    } catch { return []; }
   }
 
   function saveHistory(mode, entry) {
     const hist = getHistory(mode);
-    if (hist.length >= 10) hist.shift();
+    while (hist.length >= HISTORY_LENGTH) hist.shift();
     hist.push(entry);
-    localStorage.setItem('stats-' + mode, JSON.stringify(hist));
+    try { localStorage.setItem(HISTORY_KEY_PREFIX + mode, JSON.stringify(hist)); }
+    catch { /* storage full or blocked: the game still ends normally */ }
   }
 
   function showStats() {
@@ -519,11 +582,13 @@ import { createGame } from './game-core.mjs';
       const totalCorrect = hist.reduce((s, h) => s + h.correct, 0);
       const totalRounds  = hist.reduce((s, h) => s + h.rounds, 0);
       const avg = Math.round((totalCorrect / totalRounds) * 100);
-      const tip = 'Score %: ' + hist.slice(-8).map(h => Math.round((h.correct / h.rounds) * 100)).join(', ');
+      const tip = 'Punktzahl in %: ' + hist.slice(-8).map(h => Math.round((h.correct / h.rounds) * 100)).join(', ');
       $('stat-avg-pct').textContent = avg + '%';
       avgEl.className = 'stat-value stat-avg-wrap';
       $('stat-avg-tooltip').textContent = tip;
-      $('stat-avg-label').textContent = 'Average of last ' + totalRounds + ' rounds';
+      $('stat-avg-label').textContent = totalRounds === 1
+        ? 'Durchschnitt der letzten Runde'
+        : `Durchschnitt der letzten ${totalRounds} Runden`;
       avgRow.style.display = '';
     } else {
       avgRow.style.display = 'none';
@@ -566,7 +631,7 @@ import { createGame } from './game-core.mjs';
         const dir = parseInt(btn.dataset.dir);
         const valEl = setting === 'rounds' ? valRounds : valGuesses;
         const min = 1;
-        const max = setting === 'rounds' ? 50 : 10;
+        const max = setting === 'rounds' ? ROUNDS_MAX : GUESSES_MAX;
         let val = parseInt(valEl.textContent) + dir;
         val = Math.max(min, Math.min(max, val));
         valEl.textContent = val;

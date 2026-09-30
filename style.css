@@ -47,6 +47,15 @@ svg[hidden] { display: none; }
 .bundesland.wrong-guess { fill: #e05555; stroke: #a02020; stroke-width: 1.5px; }
 /* Kulisse: muted scenery beneath the Bundesländer, never interactive */
 .kulisse { fill: #e3e3de; stroke: #cfcfc8; stroke-width: 0.5px; pointer-events: none; }
+/* Touch halo for the small Bundesländer: an invisible duplicate path above
+   the map. Inert by default, so mouse hover is untouched; on touch or narrow
+   screens its stroke catches taps up to 10 screen px outside the shape
+   (non-scaling-stroke keeps that constant at every zoom level; round joins
+   stop miter spikes reaching further at sharp corners). */
+.hit-target { fill: none; stroke: transparent; stroke-linejoin: round; pointer-events: none; }
+@media (pointer: coarse), (max-width: 600px) {
+  .hit-target { pointer-events: stroke; stroke-width: 20px; }
+}
 
 /* Data credits: small, in the bottom-left corner (letterbox/Kulisse at the
    fitted view), never intercepting clicks and beneath every panel */
@@ -227,6 +236,8 @@ body[data-mode="name-country"] #game-prompt { visibility: hidden; }
 }
 #feedback-text { font-size: 0.95rem; font-weight: 600; flex: 1; min-width: 0; }
 body[data-phase="feedback"] #feedback-bar { display: flex; }
+/* Automatisch weiter: the round advances by itself, so no Weiter button */
+body[data-auto-advance="on"] #btn-next { display: none; }
 .feedback-bar--correct #feedback-text { color: #1a7a3a; }
 .feedback-bar--wrong #feedback-text { color: #c03030; }
 

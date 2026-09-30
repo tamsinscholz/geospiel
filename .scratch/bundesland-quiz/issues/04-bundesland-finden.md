@@ -35,29 +35,56 @@ target", "Score history storage", "German UI strings".
 
 **Blocked by:** 03.
 
-**Status:** ready-for-agent
+**Status:** done — landed with commit "Add Bundesland finden and the German quiz scaffolding"
 
 ### Acceptance criteria
 
-- [ ] The Einstellungen screen is titled with the chosen mode and offers Runden, Versuche pro Runde and automatisch weiter, all labelled in German, with a Zurück button that returns to the mode selection
-- [ ] Runden ranges 1–16 and defaults to **16**; Versuche ranges 1–10 and defaults to 3
-- [ ] Settings persist while the app is open, so starting a second game does not mean re-entering them
-- [ ] A game's round order has no repeats and exactly as many rounds as configured
-- [ ] During play the prompt shows the target's name and Landeswappen, and the map is neither highlighted nor zoomed
-- [ ] A correct click scores a point and moves to feedback
-- [ ] A wrong click flashes that Bundesland red briefly, costs one Versuch, and leaves the round running
-- [ ] Running out of Versuche ends the round and the feedback names the correct answer
-- [ ] **Clicking the Kulisse costs no Versuch and does nothing at all**
-- [ ] Feedback gently zooms to the answer, capped at 1.8×, with the rest of Germany still substantially in frame; the Bundesland is highlighted and its full info panel shown
-- [ ] The Weiter button takes keyboard focus; with automatisch weiter on it is absent and the round advances by itself
-- [ ] The progress bar fills as rounds complete
-- [ ] Überspringen advances with no feedback and is counted separately from wrong answers
-- [ ] Beenden goes straight to the Spiel-beendet screen, which counts the in-progress round as played
-- [ ] The Spiel-beendet screen shows Gespielte Runden, Richtig, Übersprungen and a percentage over rounds *played*, all in German
-- [ ] The rolling average across recent games for this mode is shown, with the individual recent scores on hover
-- [ ] History is kept **per mode** and survives closing the browser
-- [ ] History keys are prefixed so old world-quiz history is not read — confirm an existing unprefixed key does not affect the average
-- [ ] Zurück zum Menü returns to the mode selection with the zoom reset
-- [ ] `make test` passes
-- [ ] **Verified by driving the app, not by self-report — this gates the small-target removal:** all three Stadtstaaten (Berlin, Hamburg, Bremen) and Saarland are comfortably clickable at `k = 1` at both desktop and roughly 400px width. Report the observed hit sizes or click outcomes
-- [ ] **Verified by driving the app:** report observed score, Versuche and feedback text through a full game, including a wrong guess, a skip and an early quit
+- [x] The Einstellungen screen is titled with the chosen mode and offers Runden, Versuche pro Runde and automatisch weiter, all labelled in German, with a Zurück button that returns to the mode selection
+- [x] Runden ranges 1–16 and defaults to **16**; Versuche ranges 1–10 and defaults to 3
+- [x] Settings persist while the app is open, so starting a second game does not mean re-entering them
+- [x] A game's round order has no repeats and exactly as many rounds as configured
+- [x] During play the prompt shows the target's name and Landeswappen, and the map is neither highlighted nor zoomed
+- [x] A correct click scores a point and moves to feedback
+- [x] A wrong click flashes that Bundesland red briefly, costs one Versuch, and leaves the round running
+- [x] Running out of Versuche ends the round and the feedback names the correct answer
+- [x] **Clicking the Kulisse costs no Versuch and does nothing at all**
+- [x] Feedback gently zooms to the answer, capped at 1.8×, with the rest of Germany still substantially in frame; the Bundesland is highlighted and its full info panel shown
+- [x] The Weiter button takes keyboard focus; with automatisch weiter on it is absent and the round advances by itself
+- [x] The progress bar fills as rounds complete
+- [x] Überspringen advances with no feedback and is counted separately from wrong answers
+- [x] Beenden goes straight to the Spiel-beendet screen, which counts the in-progress round as played
+- [x] The Spiel-beendet screen shows Gespielte Runden, Richtig, Übersprungen and a percentage over rounds *played*, all in German
+- [x] The rolling average across recent games for this mode is shown, with the individual recent scores on hover
+- [x] History is kept **per mode** and survives closing the browser
+- [x] History keys are prefixed so old world-quiz history is not read — confirm an existing unprefixed key does not affect the average
+- [x] Zurück zum Menü returns to the mode selection with the zoom reset
+- [x] `make test` passes
+- [x] **Verified by driving the app, not by self-report — this gates the small-target removal:** all three Stadtstaaten (Berlin, Hamburg, Bremen) and Saarland are comfortably clickable at `k = 1` at both desktop and roughly 400px width. Report the observed hit sizes or click outcomes
+- [x] **Verified by driving the app:** report observed score, Versuche and feedback text through a full game, including a wrong guess, a skip and an early quit
+
+## Comments
+
+**Small-target gate: touch halo added for the Stadtstaaten.** Driving the app showed
+Bremen too small to tap comfortably on a phone: at 400×800 and `k = 1` its main polygon
+is 19.6×14.7 CSS px, its deepest interior point is only ~4 px from the edge, and 8 px
+from that point 43% of taps missed. Every miss lands on Niedersachsen and costs a Versuch.
+
+Decision: an invisible touch-only halo, not a return of the old overlay. Each Bundesland
+whose `area_km2` is below `SMALL_TARGET_MAX_AREA_KM2 = 1000` (Bremen, Hamburg, Berlin;
+not Saarland, ~44×35 px at 400 px) gets a duplicate path of its own geometry in
+`#hit-group` above the map, with class `.hit-target`. CSS keeps it inert by default and
+makes only its stroke clickable under `@media (pointer: coarse), (max-width: 600px)`:
+a 20 px non-scaling stroke with round joins gives ~10 screen px of reach at every zoom
+level. Hits resolve by `data-id` to the real path, so scoring, the red flash and Erkunden
+behave exactly as on the visible shape. It is derived from the metadata, so there is no
+generated data file.
+
+Trade-off: on touch/narrow screens, a tap on Niedersachsen (or Brandenburg,
+Schleswig-Holstein) within ~10 px of Bremen, Hamburg or Berlin counts as the Stadtstaat.
+Mouse hover and clicks on desktop are unchanged.
+
+Observed after the change (400×800 touch): taps within 5/8/10/12 px of the deepest
+interior point hit the target 100% of the time for Bremen, Hamburg and Berlin; the halo
+reaches ~11 px outside the shape at both `k = 1` and `k = 6`; a full 16-round game of
+Bundesland finden scored 16/16. At 1440×900 with a mouse the halo is inactive:
+hovering 5 px outside Bremen over Niedersachsen shows Niedersachsen.

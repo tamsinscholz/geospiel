@@ -62,7 +62,7 @@ The app has four modes — one free-roam and three quiz modes:
 3. **Name the Country** — country highlighted on map + flag shown, type its name
 4. **Name the Capital** — country name shown + highlighted on map, type its capital
 
-Quiz modes share a settings screen (rounds 1–50, guesses 1–10, auto-advance toggle) and an end-of-game stats screen.
+Quiz modes share a settings screen (Runden 1–16 default 16, Versuche 1–10 default 3, auto-advance toggle) and an end-of-game stats screen.
 
 ## Implementation Guidelines
 
@@ -76,7 +76,7 @@ Quiz modes share a settings screen (rounds 1–50, guesses 1–10, auto-advance 
 - **The testing seam:** all round sequencing, guess accounting and answer matching go through `createGame(...)` in `game-core.mjs`; everything environmental (timers, CSS classes, zoom, panels, score history) stays in `main.js` and is verified by driving the app.
 - **Bundesland identification:** Bundesländer are keyed by ISO 3166-2 code (e.g. `"DE-BY"` = Bayern). `featureId(d)` is the one place that maps a geometry feature to that key (the vendored TopoJSON already carries it as `d.id`).
 - **Answer validation:** one canonical `normalize()` in `game-core.mjs` is applied to both the typed answer and the reference answer (trim/lowercase, `ß`→`ss`, drop diacritics, collapse `ae`/`oe`/`ue`, strip non-alphanumerics). Names are matched through an alias table (for now built in `main.js` from the plain German names; the full table arrives with ticket 05), capitals against the item's `capital` (plus optional `capital_variants`).
-- **CSS classes on `<path>`:** `.bundesland` / `.kulisse` (the Kulisse is `pointer-events: none` in every mode), `.highlighted` (explore hover), `.target` (quiz highlight), `.wrong-guess` (brief red flash on wrong click).
+- **CSS classes on `<path>`:** `.bundesland` / `.kulisse` (the Kulisse is `pointer-events: none` in every mode), `.highlighted` (explore hover), `.target` (quiz highlight), `.wrong-guess` (brief red flash on wrong click). `.hit-target` is the invisible touch halo for small Bundesländer (area below `SMALL_TARGET_MAX_AREA_KM2`): a duplicate path in `#hit-group` whose stroke takes taps only under `(pointer: coarse), (max-width: 600px)`; handlers resolve its `data-id` to the real `.bundesland` path.
 - **Responsive:** Mobile breakpoint at 600px — stacks panels vertically, hides the Landeswappen in the game panel, adjusts border radii.
 
 ## Agent skills
