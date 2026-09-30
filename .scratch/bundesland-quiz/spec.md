@@ -186,39 +186,45 @@ readability than it buys.
 
 ### Bundesland identity
 
-Bundesländer are keyed by the two-digit German administrative land key (the AGS/
-Regionalschlüssel prefix), zero-padded as a string. This replaces the three-digit
-zero-padded ISO numeric country ID, and it is the canonical German key, stable and
-naturally sortable:
+Bundesländer are keyed by their **ISO 3166-2 subdivision code**, replacing the
+three-digit zero-padded ISO numeric country ID. One key serves both the metadata lookup
+and the Landeswappen asset name, so there is no second identifier to keep in sync:
 
-| Key | Bundesland | ISO 3166-2 |
+| Key | Bundesland | Landeshauptstadt |
 |---|---|---|
-| `01` | Schleswig-Holstein | DE-SH |
-| `02` | Hamburg | DE-HH |
-| `03` | Niedersachsen | DE-NI |
-| `04` | Bremen | DE-HB |
-| `05` | Nordrhein-Westfalen | DE-NW |
-| `06` | Hessen | DE-HE |
-| `07` | Rheinland-Pfalz | DE-RP |
-| `08` | Baden-Württemberg | DE-BW |
-| `09` | Bayern | DE-BY |
-| `10` | Saarland | DE-SL |
-| `11` | Berlin | DE-BE |
-| `12` | Brandenburg | DE-BB |
-| `13` | Mecklenburg-Vorpommern | DE-MV |
-| `14` | Sachsen | DE-SN |
-| `15` | Sachsen-Anhalt | DE-ST |
-| `16` | Thüringen | DE-TH |
+| `DE-BW` | Baden-Württemberg | Stuttgart |
+| `DE-BY` | Bayern | München |
+| `DE-BE` | Berlin | Berlin |
+| `DE-BB` | Brandenburg | Potsdam |
+| `DE-HB` | Bremen | Bremen |
+| `DE-HH` | Hamburg | Hamburg |
+| `DE-HE` | Hessen | Wiesbaden |
+| `DE-MV` | Mecklenburg-Vorpommern | Schwerin |
+| `DE-NI` | Niedersachsen | Hannover |
+| `DE-NW` | Nordrhein-Westfalen | Düsseldorf |
+| `DE-RP` | Rheinland-Pfalz | Mainz |
+| `DE-SL` | Saarland | Saarbrücken |
+| `DE-SN` | Sachsen | Dresden |
+| `DE-ST` | Sachsen-Anhalt | Magdeburg |
+| `DE-SH` | Schleswig-Holstein | Kiel |
+| `DE-TH` | Thüringen | Erfurt |
 
-Whatever property the chosen geometry source carries, it is normalised to this key by a
-single `featureId(feature)` function at render time — the same pattern as the existing
-`String(d.id).padStart(3, '0')`. Exactly one place in the code knows how the geometry
-source spells its identifiers.
+ISO 3166-2 is preferred over the two-digit AGS land key and over name slugs: it is
+self-describing at a glance (`DE-BY` reads as Bayern in a way `09` does not), it is
+stable and international rather than tied to German administrative numbering, and it
+needs no separate asset key. Its one cost is that it does not sort into the conventional
+German ordering — display order is therefore sorted by name, not by key.
 
-The ISO 3166-2 code is kept as a field on each Bundesland purely as the Landeswappen
-asset key, mirroring how `iso_a2` fed the flag URL. A single `wappenUrl(key)` function
-is the only code that knows where Landeswappen images come from, so swapping the source
-later touches one line.
+Whatever property the chosen geometry source carries — Eurostat GISCO supplies NUTS-1
+codes (`DE1`, `DE2`, …), and processing pipelines often slugify names — it is normalised
+to this key by a single `featureId(feature)` function at render time, the same pattern as
+the existing `String(d.id).padStart(3, '0')`. Exactly one place in the code knows how the
+geometry source spells its identifiers.
+
+Landeswappen assets are named by the key, lowercased (`de-by.svg`), so that filenames
+never depend on filesystem case sensitivity — matching the old lowercase `iso_a2` flag
+convention. A single `wappenUrl(key)` function is the only code that knows where
+Landeswappen come from, so changing the source later touches one line.
 
 ### Map projection, extent, and the pan clamp
 
