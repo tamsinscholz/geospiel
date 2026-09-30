@@ -31,7 +31,7 @@ import { createGame } from './game-core.mjs';
   /* === Constants === */
   const MODE_LABELS = {
     'find': 'Bundesland finden',
-    'name-country': 'Bundesland benennen',
+    'name-bundesland': 'Bundesland benennen',
     'name-capital': 'Landeshauptstadt benennen',
   };
 
@@ -213,17 +213,15 @@ import { createGame } from './game-core.mjs';
 
   /* === Data Loading === */
   async function loadData() {
-    const [topology, kulisseTopology, bundeslaender] = await Promise.all([
+    const [topology, kulisseTopology, bundeslaender, aliases] = await Promise.all([
       d3.json('data/bundeslaender.topo.json'),
       d3.json('data/kulisse.topo.json'),
       d3.json('data/bundeslaender.json'),
+      d3.json('data/bundesland-aliases.json'),
     ]);
 
     bundeslaenderData = bundeslaender;
-    // Placeholder until the Bundesland alias table lands: the plain German
-    // names only, so Bundesland benennen is playable in the meantime.
-    aliasesData = Object.fromEntries(
-      Object.entries(bundeslaender).map(([key, b]) => [b.name, key]));
+    aliasesData = aliases;
     geoFeatures = topojson.feature(topology, topology.objects.bundeslaender).features;
     kulisseFeatures = topojson.feature(kulisseTopology, kulisseTopology.objects.kulisse).features;
     const germany = topojson.merge(topology, topology.objects.bundeslaender.geometries);
@@ -457,7 +455,9 @@ import { createGame } from './game-core.mjs';
     const c = bundeslaenderData[id];
 
     gameWappen.src = wappenUrl(id);
-    gameWappen.alt = 'Landeswappen ' + c.name;
+    // Generic alt text: in Bundesland benennen the name is the answer, and a
+    // Wappen that fails to load would otherwise print it in the panel
+    gameWappen.alt = 'Landeswappen';
     gamePrompt.textContent = c.name;
     hudScore.textContent = state.score;
     hudGuesses.textContent = state.guessesLeft;
@@ -473,12 +473,13 @@ import { createGame } from './game-core.mjs';
     // give the answer away; undo the previous round's feedback zoom
     if (gameState.mode === 'find') resetZoom();
 
-    if (gameState.mode === 'name-country' || gameState.mode === 'name-capital') {
+    if (gameState.mode === 'name-bundesland' || gameState.mode === 'name-capital') {
       highlightTarget(id);
       zoomToBundesland(id);
-      guessInput.placeholder = gameState.mode === 'name-country'
-        ? 'Name the country\u2026'
+      guessInput.placeholder = gameState.mode === 'name-bundesland'
+        ? 'Bundesland eingeben \u2026'
         : 'Name the capital\u2026';
+      // Focus once the 750ms gentle zoom has settled
       setTimeout(() => guessInput.focus(), 800);
     }
   }

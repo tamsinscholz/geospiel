@@ -200,7 +200,9 @@ body[data-mode="name-capital"] #game-wappen-wrap { display: none; }
 /* Identity in game panel */
 .panel-identity { min-width: 0; }
 #game-prompt { font-size: 1.1rem; font-weight: 700; color: #222; }
-body[data-mode="name-country"] #game-prompt { visibility: hidden; }
+/* Bundesland benennen: the name is the answer, so it stays hidden while
+   playing and is revealed with the feedback (always the German name) */
+body[data-mode="name-bundesland"][data-phase="playing"] #game-prompt { visibility: hidden; }
 
 /* HUD */
 .game-hud {
@@ -265,7 +267,7 @@ body[data-mode="explore"] #country-panel.visible { display: grid; }
 #input-panel {
   display: none; flex-direction: column; gap: 8px;
 }
-body[data-phase="playing"][data-mode="name-country"] #input-panel,
+body[data-phase="playing"][data-mode="name-bundesland"] #input-panel,
 body[data-phase="playing"][data-mode="name-capital"] #input-panel { display: flex; }
 
 #input-feedback {

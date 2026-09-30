@@ -103,7 +103,7 @@ export function shuffleInPlace(arr) {
  * @param {object}   options
  * @param {object}   options.items        item id -> item record
  * @param {object}   [options.aliases]    alias string -> item id
- * @param {string}   options.mode         'find' | 'name-country' | 'name-bundesland' | 'name-capital'
+ * @param {string}   options.mode         'find' | 'name-bundesland' | 'name-capital'
  * @param {number}   [options.totalRounds] clamped to the number of items
  * @param {number}   [options.maxGuesses]
  * @param {function} [options.shuffle]    injected for deterministic tests
@@ -210,7 +210,7 @@ export function createGame({
       if (s.mode === 'name-capital') {
         return resolve(matchCapital(text, items[s.targetId]));
       }
-      if (s.mode === 'name-country' || s.mode === 'name-bundesland') {
+      if (s.mode === 'name-bundesland') {
         return resolve(matchBundesland(text, aliases) === s.targetId);
       }
       return ignored();

@@ -28,10 +28,12 @@ Single-page vanilla JS application — no bundler, no npm.
 | `main.js` | The browser shell — D3 map setup, zoom, DOM rendering, timers, event wiring, data loading, `localStorage`. Loaded as an ES module |
 | `game-core.mjs` | The game's rules, pure: round order, guess accounting, answer matching. Imports nothing, touches no DOM/D3/`localStorage`/timers. The only module under test |
 | `test/game-core.test.mjs` | Tests for `game-core.mjs` — `node --test`, `node:assert`, synthetic fixtures |
+| `test/aliases.test.mjs` | The real alias table through `matchBundesland`/`guessByText`, plus a normalised-key collision check |
 | `style.css` | Layout, overlays, panels, buttons, responsive breakpoints |
 | `data/bundeslaender.topo.json` | Bundesland geometry (TopoJSON object `bundeslaender`, `id` = ISO 3166-2 key such as `DE-BY`) |
 | `data/kulisse.topo.json` | Neighbouring countries' land (object `kulisse`), drawn as muted scenery beneath the Bundesländer |
 | `data/bundeslaender.json` | Bundesland metadata keyed by ISO 3166-2 key (name, capital, population, area_km2, highest_point, neighbour_count) |
+| `data/bundesland-aliases.json` | Hand-authored alias table: readable spelling → ISO 3166-2 key (plain names, official long forms, abbreviations, English names, misspellings). Keys are normalised at match time, so write them readably |
 | `wappen/de-xx.svg` | Landeswappen, named by the lowercased ISO 3166-2 key |
 | `countries.json`, `aliases.json` | World-quiz data, no longer loaded by the app (removed in ticket 07) |
 
@@ -44,7 +46,7 @@ are shown in the corner of the map (`#map-credits`).
 - Google Fonts — Inter typeface
 
 **Data flow:**
-1. `main.js` fetches the two local TopoJSON files + `data/bundeslaender.json` (parallel `Promise.all`)
+1. `main.js` fetches the two local TopoJSON files + `data/bundeslaender.json` + `data/bundesland-aliases.json` (parallel `Promise.all`)
 2. Converts topology → GeoJSON features via `topojson.feature()` (and `topojson.merge()` for the German outline)
 3. A D3 conic conformal projection (parallels 48.5°/53.5°, central meridian 10.5°E) is fitted to the German outline
 4. The Kulisse and the Bundesländer are rendered as `<path>` elements in two groups inside one zoomed `<g>`, Kulisse beneath
@@ -67,7 +69,7 @@ Quiz modes share a settings screen (Runden 1–16 default 16, Versuche 1–10 de
 ## Implementation Guidelines
 
 - **Prefer CSS over JS for layout:** Use media queries, `:hover`, flex/grid, and `display: none` toggling via class names for responsive behavior. Avoid JS resize handlers or manual style manipulation when CSS can achieve the same result.
-- **Drive UI visibility from `data-phase` and `data-mode` on `<body>`:** JS sets `document.body.dataset.phase` (`idle`, `playing`, `feedback`) and `document.body.dataset.mode` (`explore`, `find`, `name-country`, `name-capital`). CSS attribute selectors control which panels, buttons, and elements are visible for each combination — no manual `.classList.add('hidden')` calls per transition. Mode-specific differences (e.g. flag hidden in Name Capital, prompt hidden in Name Country) are CSS rules, not JS branches.
+- **Drive UI visibility from `data-phase` and `data-mode` on `<body>`:** JS sets `document.body.dataset.phase` (`idle`, `playing`, `feedback`) and `document.body.dataset.mode` (`explore`, `find`, `name-bundesland`, `name-capital`). CSS attribute selectors control which panels, buttons, and elements are visible for each combination — no manual `.classList.add('hidden')` calls per transition. Mode-specific differences (e.g. flag hidden in Name Capital, prompt hidden while playing Bundesland benennen) are CSS rules, not JS branches.
 
 ## Key Patterns
 
@@ -75,7 +77,7 @@ Quiz modes share a settings screen (Runden 1–16 default 16, Versuche 1–10 de
 - **Game state:** `game-core.mjs` owns round order, score, skipped count, remaining guesses and the current target; `main.js` keeps only the shell's own state (mode, phase, screen, the chosen settings, the auto-advance timer) and renders what the core reports. Phase and mode are mirrored to `<body>` data attributes so CSS drives visibility.
 - **The testing seam:** all round sequencing, guess accounting and answer matching go through `createGame(...)` in `game-core.mjs`; everything environmental (timers, CSS classes, zoom, panels, score history) stays in `main.js` and is verified by driving the app.
 - **Bundesland identification:** Bundesländer are keyed by ISO 3166-2 code (e.g. `"DE-BY"` = Bayern). `featureId(d)` is the one place that maps a geometry feature to that key (the vendored TopoJSON already carries it as `d.id`).
-- **Answer validation:** one canonical `normalize()` in `game-core.mjs` is applied to both the typed answer and the reference answer (trim/lowercase, `ß`→`ss`, drop diacritics, collapse `ae`/`oe`/`ue`, strip non-alphanumerics). Names are matched through an alias table (for now built in `main.js` from the plain German names; the full table arrives with ticket 05), capitals against the item's `capital` (plus optional `capital_variants`).
+- **Answer validation:** one canonical `normalize()` in `game-core.mjs` is applied to both the typed answer and the reference answer (trim/lowercase, `ß`→`ss`, drop diacritics, collapse `ae`/`oe`/`ue`, strip non-alphanumerics). Names are matched through the alias table `data/bundesland-aliases.json` (a collision test keeps any two keys from normalising together while pointing at different Bundesländer), capitals against the item's `capital` (plus optional `capital_variants`).
 - **CSS classes on `<path>`:** `.bundesland` / `.kulisse` (the Kulisse is `pointer-events: none` in every mode), `.highlighted` (explore hover), `.target` (quiz highlight), `.wrong-guess` (brief red flash on wrong click). `.hit-target` is the invisible touch halo for small Bundesländer (area below `SMALL_TARGET_MAX_AREA_KM2`): a duplicate path in `#hit-group` whose stroke takes taps only under `(pointer: coarse), (max-width: 600px)`; handlers resolve its `data-id` to the real `.bundesland` path.
 - **Responsive:** Mobile breakpoint at 600px — stacks panels vertically, hides the Landeswappen in the game panel, adjusts border radii.
 
