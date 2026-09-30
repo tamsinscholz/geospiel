@@ -274,9 +274,12 @@ body[data-phase="playing"][data-mode="name-capital"] #input-panel { display: fle
   font-size: 0.88rem; min-height: 1.2em;
   color: #c03030; font-weight: 600;
 }
-.input-row { display: flex; gap: 10px; align-items: center; }
+/* The input's basis fits the longest placeholder, "Landeshauptstadt
+   eingeben …"; on a narrow screen Antworten wraps below it instead of
+   truncating the placeholder or pushing the row out of the panel. */
+.input-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; align-items: center; }
 .guess-input {
-  flex: 1; padding: 10px 14px; border-radius: 8px;
+  flex: 1 1 17rem; min-width: 0; padding: 10px 14px; border-radius: 8px;
   border: 1.5px solid #ccc; background: #fff;
   font-size: 1rem; font-family: inherit; outline: none;
 }

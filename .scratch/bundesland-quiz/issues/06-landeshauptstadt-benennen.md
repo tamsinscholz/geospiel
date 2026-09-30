@@ -19,20 +19,20 @@ CSS-driven visibility", "German UI strings".
 
 **Blocked by:** 05.
 
-**Status:** ready-for-agent
+**Status:** done — landed with commit "Finish Landeshauptstadt benennen"
 
 ### Acceptance criteria
 
-- [ ] The Bundesland name is shown as the prompt and the **Landeswappen is hidden**
-- [ ] Showing and hiding is driven by the mode attribute in CSS, not by a JS branch per transition
-- [ ] All sixteen Landeshauptstädte are accepted when spelled correctly
-- [ ] Umlaut and transliterated spellings both score — at least `München` / `Muenchen`, `Düsseldorf` / `Duesseldorf`, `Saarbrücken` / `Saarbruecken`
-- [ ] A different Bundesland's Landeshauptstadt is **rejected**
-- [ ] An unknown city name is rejected rather than throwing
-- [ ] The feedback names the **Landeshauptstadt** when the answer is missed, not the Bundesland
-- [ ] The map gently zooms to the highlighted Bundesland on round start, as in 05
-- [ ] Wrong-answer messages, singular and plural, and the empty-submit no-op all behave as in 05
-- [ ] The input placeholder and every other string in the mode are German
-- [ ] Capital matching is covered by tests at the game-core seam
-- [ ] `make test` passes
-- [ ] **Verified by driving the app, not by self-report:** report the observed outcome for a correct capital, an umlaut-free spelling of one, another Bundesland's capital, and a missed round's feedback text
+- [x] The Bundesland name is shown as the prompt and the **Landeswappen is hidden**
+- [x] Showing and hiding is driven by the mode attribute in CSS, not by a JS branch per transition
+- [x] All sixteen Landeshauptstädte are accepted when spelled correctly
+- [x] Umlaut and transliterated spellings both score — at least `München` / `Muenchen`, `Düsseldorf` / `Duesseldorf`, `Saarbrücken` / `Saarbruecken`
+- [x] A different Bundesland's Landeshauptstadt is **rejected**
+- [x] An unknown city name is rejected rather than throwing
+- [x] The feedback names the **Landeshauptstadt** when the answer is missed, not the Bundesland
+- [x] The map gently zooms to the highlighted Bundesland on round start, as in 05
+- [x] Wrong-answer messages, singular and plural, and the empty-submit no-op all behave as in 05
+- [x] The input placeholder and every other string in the mode are German
+- [x] Capital matching is covered by tests at the game-core seam
+- [x] `make test` passes
+- [x] **Verified by driving the app, not by self-report:** report the observed outcome for a correct capital, an umlaut-free spelling of one, another Bundesland's capital, and a missed round's feedback text

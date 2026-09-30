@@ -102,6 +102,10 @@ test('every metadata field is populated with the right type', () => {
     assert.ok(typeof m.highest_point?.elevation_m === 'number' && m.highest_point.elevation_m > 0,
       where + 'highest_point.elevation_m');
     assert.ok(Number.isInteger(m.neighbour_count) && m.neighbour_count > 0, where + 'neighbour_count');
+    if ('capital_variants' in m) {
+      assert.ok(Array.isArray(m.capital_variants) && m.capital_variants.length > 0, where + 'capital_variants');
+      assert.ok(m.capital_variants.every(v => typeof v === 'string' && v.length > 0), where + 'capital_variants[]');
+    }
   }
 });
 

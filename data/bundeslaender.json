@@ -13,6 +13,7 @@
   "DE-BY": {
     "name": "Bayern",
     "capital": "München",
+    "capital_variants": ["Munich"],
     "population": 13248928,
     "area_km2": 70541.77,
     "highest_point": {
@@ -90,6 +91,7 @@
   "DE-NI": {
     "name": "Niedersachsen",
     "capital": "Hannover",
+    "capital_variants": ["Hanover"],
     "population": 8004489,
     "area_km2": 47709.9,
     "highest_point": {

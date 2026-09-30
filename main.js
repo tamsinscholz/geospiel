@@ -478,7 +478,7 @@ import { createGame } from './game-core.mjs';
       zoomToBundesland(id);
       guessInput.placeholder = gameState.mode === 'name-bundesland'
         ? 'Bundesland eingeben \u2026'
-        : 'Name the capital\u2026';
+        : 'Landeshauptstadt eingeben \u2026';
       // Focus once the 750ms gentle zoom has settled
       setTimeout(() => guessInput.focus(), 800);
     }

@@ -29,10 +29,11 @@ Single-page vanilla JS application — no bundler, no npm.
 | `game-core.mjs` | The game's rules, pure: round order, guess accounting, answer matching. Imports nothing, touches no DOM/D3/`localStorage`/timers. The only module under test |
 | `test/game-core.test.mjs` | Tests for `game-core.mjs` — `node --test`, `node:assert`, synthetic fixtures |
 | `test/aliases.test.mjs` | The real alias table through `matchBundesland`/`guessByText`, plus a normalised-key collision check |
+| `test/capitals.test.mjs` | The real Landeshauptstädte (and `capital_variants`) through `matchCapital`/`guessByText`, including a 16×16 other-capital rejection check |
 | `style.css` | Layout, overlays, panels, buttons, responsive breakpoints |
 | `data/bundeslaender.topo.json` | Bundesland geometry (TopoJSON object `bundeslaender`, `id` = ISO 3166-2 key such as `DE-BY`) |
 | `data/kulisse.topo.json` | Neighbouring countries' land (object `kulisse`), drawn as muted scenery beneath the Bundesländer |
-| `data/bundeslaender.json` | Bundesland metadata keyed by ISO 3166-2 key (name, capital, population, area_km2, highest_point, neighbour_count) |
+| `data/bundeslaender.json` | Bundesland metadata keyed by ISO 3166-2 key (name, capital, optional capital_variants, population, area_km2, highest_point, neighbour_count) |
 | `data/bundesland-aliases.json` | Hand-authored alias table: readable spelling → ISO 3166-2 key (plain names, official long forms, abbreviations, English names, misspellings). Keys are normalised at match time, so write them readably |
 | `wappen/de-xx.svg` | Landeswappen, named by the lowercased ISO 3166-2 key |
 | `countries.json`, `aliases.json` | World-quiz data, no longer loaded by the app (removed in ticket 07) |
