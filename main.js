@@ -296,6 +296,14 @@ import { createGame } from './game-core.mjs';
     zoom = d3.zoom()
       .scaleExtent([MIN_ZOOM, MAX_ZOOM])
       .translateExtent(viewBoxExtent())
+      // d3's smooth zoom breaks down when the two views are centred almost,
+      // but not exactly, on the same point (e.g. resetting after a wheel zoom
+      // at the map's centre): its duration comes out non-finite and every
+      // frame is NaN. Fall back to plain interpolation for just that case.
+      .interpolate((a, b) => {
+        const i = d3.interpolateZoom(a, b);
+        return Number.isFinite(i.duration) ? i : d3.interpolate(a, b);
+      })
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
       });
@@ -469,17 +477,21 @@ import { createGame } from './game-core.mjs';
 
     setPhase('playing');
 
-    // Bundesland finden starts un-highlighted and un-zoomed, or the map would
-    // give the answer away; undo the previous round's feedback zoom
-    if (gameState.mode === 'find') resetZoom();
+    // Only Landeshauptstadt benennen travels to the target, location to
+    // location. The other quiz modes stay on the overview: zooming in for
+    // feedback and back out for the next round, every round, is tiring. They
+    // return to the overview only if the user has zoomed in themselves (at
+    // k = 1 the reset changes nothing), which in Bundesland finden also keeps
+    // the start un-zoomed, so the map gives nothing away.
+    if (gameState.mode === 'name-capital') zoomToBundesland(id);
+    else resetZoom();
 
     if (gameState.mode === 'name-bundesland' || gameState.mode === 'name-capital') {
       highlightTarget(id);
-      zoomToBundesland(id);
       guessInput.placeholder = gameState.mode === 'name-bundesland'
         ? 'Bundesland eingeben \u2026'
         : 'Landeshauptstadt eingeben \u2026';
-      // Focus once the 750ms gentle zoom has settled
+      // Focus once the map has settled (the 750ms gentle zoom, when there is one)
       setTimeout(() => guessInput.focus(), 800);
     }
   }
@@ -508,7 +520,8 @@ import { createGame } from './game-core.mjs';
 
     fillBundeslandInfo(id);
     highlightTarget(id);
-    zoomToBundesland(id);
+    // Re-centre on the target only where the round is already zoomed to it
+    if (gameState.mode === 'name-capital') zoomToBundesland(id);
     hudScore.textContent = state.score;
     // The round is complete once it reaches feedback
     renderProgress(state.currentRound + 1, state.totalRounds);

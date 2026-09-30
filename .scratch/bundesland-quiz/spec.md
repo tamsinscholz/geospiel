@@ -302,6 +302,13 @@ Applies on round start in Bundesland benennen and Landeshauptstadt benennen, and
 entering feedback in all three quiz modes. Bundesland finden does not zoom or highlight
 during play.
 
+**Amended 2026-09-30 after playing:** the in-and-out cycle every round was tiring.
+The gentle zoom now applies **only in Landeshauptstadt benennen** (round start and
+feedback), where it moves from location to location. Bundesland finden and Bundesland
+benennen stay on the full-Germany overview — no zoom on round start or feedback; the
+target is only highlighted — and return to the overview at round start only if the user
+has zoomed in themselves.
+
 ### Rounds and guesses
 
 - **Runden:** range `1`–`16`, default `16`. The existing round-order logic (shuffle all
