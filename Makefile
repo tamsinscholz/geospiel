@@ -12,9 +12,10 @@ run:
 test:
 	node --test test/
 
-# Nothing is generated or cached in this repo, so there is nothing to remove.
+# The only cache is tools/vendor-germany-data.sh's download cache (GISCO
+# GeoJSON + raw Commons SVGs); it is re-downloaded on the next run. The vendored
+# data/ and wappen/ outputs are committed and never cleaned.
 clean:
-	@echo "Nothing to clean."
+	rm -rf tools/.cache
 
 clean-all: clean
-	@echo "Nothing to clean."

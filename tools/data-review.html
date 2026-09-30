@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Germany data review</title>
+  <!--
+    Dev tool, not part of the game: eyeball the vendored Germany data.
+    Serve the repo root (make run) and open /tools/data-review.html.
+  -->
+  <style>
+    :root {
+      --bg: #f4f6f8; --fg: #1d2530; --muted: #6b7684; --line: #d5dbe2;
+      --sea: #dfe9f2; --kulisse: #d9d9d4; --kulisse-line: #bdbdb6;
+      --land: #8fb996; --land-line: #fff; --hover: #e0a93b;
+      --ok: #1f7a3a; --bad: #c62828;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+    header, section { padding: 12px 20px; }
+    h1 { font-size: 20px; margin: 8px 0; }
+    h2 { font-size: 16px; margin: 16px 0 8px; }
+    .muted { color: var(--muted); }
+
+    #map-section { display: flex; gap: 16px; }
+    #map-wrap { flex: 1; min-width: 0; height: 78vh; background: var(--sea); border: 1px solid var(--line); }
+    #map { width: 100%; height: 100%; display: block; }
+    .kulisse { fill: var(--kulisse); stroke: var(--kulisse-line); stroke-width: 0.5; pointer-events: none; }
+    .bundesland { fill: var(--land); stroke: var(--land-line); stroke-width: 0.8; cursor: pointer; }
+    .bundesland:hover, .bundesland.highlighted { fill: var(--hover); }
+    .viewbox-frame { fill: none; stroke: #c33; stroke-dasharray: 4 4; stroke-width: 1; pointer-events: none; }
+    .label { font: 600 11px system-ui, sans-serif; text-anchor: middle; dominant-baseline: middle;
+             fill: #1d2530; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
+
+    #panel { width: 300px; flex: none; background: #fff; border: 1px solid var(--line); padding: 12px; }
+    #panel img { width: 96px; height: 96px; object-fit: contain; display: block; margin-bottom: 8px; }
+    #panel dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0; }
+    #panel dt { color: var(--muted); }
+    #panel dd { margin: 0; }
+
+    #checks li { margin: 2px 0; }
+    .pass { color: var(--ok); font-weight: 600; }
+    .fail { color: var(--bad); font-weight: 600; }
+
+    #wappen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 10px; }
+    .wappen-card { background: #fff; border: 1px solid var(--line); padding: 10px; display: flex; gap: 10px; align-items: center; }
+    .wappen-card .small { width: 56px; height: 56px; object-fit: contain; flex: none; }
+    .wappen-card .large { width: 110px; height: 110px; object-fit: contain; flex: none; }
+    .wappen-card .caption { font-size: 12px; }
+
+    table { border-collapse: collapse; background: #fff; width: 100%; }
+    th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.mismatch { color: var(--bad); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Germany data review</h1>
+    <div class="muted">
+      <code>data/bundeslaender.topo.json</code>, <code>data/kulisse.topo.json</code>,
+      <code>data/bundeslaender.json</code>, <code>wappen/*.svg</code>.
+      Dashed red frame = the padded Germany viewBox; everything outside it is letterbox, filled by the Kulisse.
+    </div>
+  </header>
+
+  <section>
+    <h2>Structural checks</h2>
+    <ul id="checks"><li class="muted">running…</li></ul>
+  </section>
+
+  <section id="map-section">
+    <div id="map-wrap"><svg id="map" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <aside id="panel"><p class="muted">Hover a Bundesland.</p></aside>
+  </section>
+
+  <section>
+    <h2>Landeswappen (56px as in the game, and larger)</h2>
+    <div id="wappen-grid"></div>
+  </section>
+
+  <section>
+    <h2>Metadata</h2>
+    <table id="meta-table"></table>
+  </section>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script type="module">
+    const ISO_KEYS = ['DE-BB', 'DE-BE', 'DE-BW', 'DE-BY', 'DE-HB', 'DE-HE', 'DE-HH', 'DE-MV',
+                      'DE-NI', 'DE-NW', 'DE-RP', 'DE-SH', 'DE-SL', 'DE-SN', 'DE-ST', 'DE-TH'];
+    const wappenUrl = key => `../wappen/${key.toLowerCase()}.svg`;
+    const fmt = new Intl.NumberFormat('de-DE');
+    const fmtArea = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+
+    const [topo, kulisseTopo, meta] = await Promise.all([
+      d3.json('../data/bundeslaender.topo.json'),
+      d3.json('../data/kulisse.topo.json'),
+      d3.json('../data/bundeslaender.json'),
+    ]);
+    const states = topojson.feature(topo, topo.objects.bundeslaender).features;
+    const kulisse = topojson.feature(kulisseTopo, kulisseTopo.objects.kulisse).features;
+    const germany = topojson.merge(topo, topo.objects.bundeslaender.geometries);
+
+    // Neighbour counts computed from the topology: two Bundesländer are
+    // neighbours when they share an arc (a stretch of border, not a point).
+    const geoms = topo.objects.bundeslaender.geometries;
+    const computedNeighbours = Object.fromEntries(
+      topojson.neighbors(geoms).map((ns, i) => [geoms[i].id, ns.map(j => geoms[j].id).sort()]));
+
+    /* === Map === */
+    const projection = d3.geoConicConformal().parallels([48.5, 53.5]).rotate([-10.5, 0]);
+    projection.fitSize([1000, 1000], germany);
+    const path = d3.geoPath(projection);
+    const [[x0, y0], [x1, y1]] = path.bounds(germany);
+    const pad = 20;
+    const vb = [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad];
+    const svg = d3.select('#map').attr('viewBox', vb.join(' '));
+
+    svg.append('g').selectAll('path').data(kulisse).join('path')
+      .attr('class', 'kulisse').attr('d', path);
+    svg.append('g').selectAll('path').data(states).join('path')
+      .attr('class', 'bundesland').attr('d', path)
+      .on('mouseenter', (event, d) => showPanel(d.id))
+      .append('title').text(d => d.id);
+    svg.append('rect').attr('class', 'viewbox-frame')
+      .attr('x', vb[0]).attr('y', vb[1]).attr('width', vb[2]).attr('height', vb[3]);
+    svg.append('g').selectAll('text').data(states).join('text')
+      .attr('class', 'label')
+      .attr('transform', d => `translate(${path.centroid(d)})`)
+      .text(d => d.id.slice(3));
+
+    function showPanel(key) {
+      d3.selectAll('.bundesland').classed('highlighted', d => d.id === key);
+      const m = meta[key];
+      const panel = document.getElementById('panel');
+      if (!m) { panel.innerHTML = `<p class="fail">${key}: no metadata</p>`; return; }
+      panel.innerHTML = `
+        <img src="${wappenUrl(key)}" alt="Wappen ${m.name}">
+        <h2>${m.name} <span class="muted">${key}</span></h2>
+        <dl>
+          <dt>Landeshauptstadt</dt><dd>${m.capital}</dd>
+          <dt>Einwohner</dt><dd>${fmt.format(m.population)}</dd>
+          <dt>Fläche</dt><dd>${fmtArea.format(m.area_km2)} km²</dd>
+          <dt>Höchster Punkt</dt><dd>${m.highest_point.name} (${fmt.format(m.highest_point.elevation_m)} m)</dd>
+          <dt>Nachbarländer</dt><dd>${m.neighbour_count} (Topologie: ${computedNeighbours[key]?.length})</dd>
+          <dt>Nachbarn</dt><dd>${(computedNeighbours[key] || []).join(', ')}</dd>
+        </dl>`;
+    }
+
+    /* === Wappen grid (sorted by name, as the game orders them) === */
+    const byName = Object.keys(meta).sort((a, b) => meta[a].name.localeCompare(meta[b].name, 'de'));
+    document.getElementById('wappen-grid').innerHTML = byName.map(key => `
+      <div class="wappen-card">
+        <img class="small" src="${wappenUrl(key)}" alt="">
+        <img class="large" src="${wappenUrl(key)}" alt="">
+        <div class="caption"><strong>${meta[key].name}</strong><br>${key}</div>
+      </div>`).join('');
+
+    /* === Metadata table === */
+    const table = document.getElementById('meta-table');
+    table.innerHTML = `
+      <tr><th>Key</th><th>Name</th><th>Landeshauptstadt</th><th>Einwohner</th><th>Fläche</th>
+          <th>Höchster Punkt</th><th>Höhe</th><th>Nachbarländer</th><th>aus Topologie</th><th>Nachbarn (Topologie)</th></tr>` +
+      byName.map(key => {
+        const m = meta[key];
+        const computed = computedNeighbours[key]?.length;
+        const bad = computed !== m.neighbour_count ? ' mismatch' : '';
+        return `<tr>
+          <td>${key}</td><td>${m.name}</td><td>${m.capital}</td>
+          <td class="num">${fmt.format(m.population)}</td>
+          <td class="num">${fmtArea.format(m.area_km2)} km²</td>
+          <td>${m.highest_point.name}</td>
+          <td class="num">${fmt.format(m.highest_point.elevation_m)} m</td>
+          <td class="num${bad}">${m.neighbour_count}</td>
+          <td class="num${bad}">${computed ?? '—'}</td>
+          <td>${(computedNeighbours[key] || []).join(', ')}</td></tr>`;
+      }).join('');
+
+    /* === Structural checks (the same set agreement as test/data.test.mjs) === */
+    const geoKeys = geoms.map(g => g.id);
+    const metaKeys = Object.keys(meta);
+    const wappenOk = await Promise.all(geoKeys.map(k =>
+      fetch(wappenUrl(k)).then(r => r.ok && r.text().then(() => true), () => false)));
+    // The dev server (python -m http.server) lists directories; use that to find orphans.
+    const wappenFiles = await fetch('../wappen/').then(r => r.ok ? r.text() : null, () => null)
+      .then(html => html && [...html.matchAll(/href="([^"]+\.svg)"/g)].map(m => decodeURIComponent(m[1])));
+
+    const same = (a, b) => a.length === b.length && [...a].sort().every((x, i) => x === [...b].sort()[i]);
+    const fieldsOk = key => {
+      const m = meta[key];
+      return typeof m.name === 'string' && m.name && typeof m.capital === 'string' && m.capital &&
+        Number.isInteger(m.population) && m.population > 0 &&
+        typeof m.area_km2 === 'number' && m.area_km2 > 0 &&
+        typeof m.highest_point?.name === 'string' && m.highest_point.name &&
+        typeof m.highest_point?.elevation_m === 'number' && m.highest_point.elevation_m > 0 &&
+        Number.isInteger(m.neighbour_count) && m.neighbour_count > 0;
+    };
+    const checks = [
+      ['Geometry has exactly 16 Bundesländer', geoKeys.length === 16],
+      ['Geometry keys are exactly the 16 ISO 3166-2 keys', same(geoKeys, ISO_KEYS)],
+      ['Every geometry key has metadata', geoKeys.every(k => k in meta)],
+      ['Every metadata key has geometry', metaKeys.every(k => geoKeys.includes(k))],
+      ['Every geometry key has a Wappen file', wappenOk.every(Boolean)],
+      ['No orphan Wappen files', wappenFiles === null ? null
+        : same(wappenFiles, geoKeys.map(k => `${k.toLowerCase()}.svg`))],
+      ['Every metadata field is populated with the right type', metaKeys.every(fieldsOk)],
+      ['Stadtstaaten: Berlin 1, Bremen 1, Hamburg 2 Nachbarländer',
+        meta['DE-BE']?.neighbour_count === 1 && meta['DE-HB']?.neighbour_count === 1 && meta['DE-HH']?.neighbour_count === 2],
+      ['Curated Nachbarländer equal the shared-arc adjacency',
+        metaKeys.every(k => computedNeighbours[k]?.length === meta[k].neighbour_count)],
+      ['Kulisse contains no German territory', !kulisse.some(f => f.id === 'DE')],
+    ];
+    document.getElementById('checks').innerHTML = checks.map(([label, ok]) =>
+      `<li><span class="${ok === null ? 'muted' : ok ? 'pass' : 'fail'}">${ok === null ? 'n/a' : ok ? 'PASS' : 'FAIL'}</span> ${label}${ok === null ? ' (no directory listing from this server)' : ''}</li>`).join('');
+    document.body.dataset.ready = 'true';
+  </script>
+</body>
+</html>

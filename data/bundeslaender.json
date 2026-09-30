@@ -1,0 +1,178 @@
+{
+  "DE-BW": {
+    "name": "Baden-Württemberg",
+    "capital": "Stuttgart",
+    "population": 11245898,
+    "area_km2": 35747.85,
+    "highest_point": {
+      "name": "Feldberg",
+      "elevation_m": 1493
+    },
+    "neighbour_count": 3
+  },
+  "DE-BY": {
+    "name": "Bayern",
+    "capital": "München",
+    "population": 13248928,
+    "area_km2": 70541.77,
+    "highest_point": {
+      "name": "Zugspitze",
+      "elevation_m": 2962
+    },
+    "neighbour_count": 4
+  },
+  "DE-BE": {
+    "name": "Berlin",
+    "capital": "Berlin",
+    "population": 3685265,
+    "area_km2": 891.12,
+    "highest_point": {
+      "name": "Großer Müggelberg",
+      "elevation_m": 115
+    },
+    "neighbour_count": 1
+  },
+  "DE-BB": {
+    "name": "Brandenburg",
+    "capital": "Potsdam",
+    "population": 2556747,
+    "area_km2": 29654.36,
+    "highest_point": {
+      "name": "Heidehöhe",
+      "elevation_m": 201
+    },
+    "neighbour_count": 5
+  },
+  "DE-HB": {
+    "name": "Bremen",
+    "capital": "Bremen",
+    "population": 704881,
+    "area_km2": 419.61,
+    "highest_point": {
+      "name": "Erhebung im Friedehorstpark",
+      "elevation_m": 33
+    },
+    "neighbour_count": 1
+  },
+  "DE-HH": {
+    "name": "Hamburg",
+    "capital": "Hamburg",
+    "population": 1862565,
+    "area_km2": 755.09,
+    "highest_point": {
+      "name": "Hasselbrack",
+      "elevation_m": 116
+    },
+    "neighbour_count": 2
+  },
+  "DE-HE": {
+    "name": "Hessen",
+    "capital": "Wiesbaden",
+    "population": 6280793,
+    "area_km2": 21115.64,
+    "highest_point": {
+      "name": "Wasserkuppe",
+      "elevation_m": 950
+    },
+    "neighbour_count": 6
+  },
+  "DE-MV": {
+    "name": "Mecklenburg-Vorpommern",
+    "capital": "Schwerin",
+    "population": 1573597,
+    "area_km2": 23294.83,
+    "highest_point": {
+      "name": "Helpter Berge",
+      "elevation_m": 179
+    },
+    "neighbour_count": 3
+  },
+  "DE-NI": {
+    "name": "Niedersachsen",
+    "capital": "Hannover",
+    "population": 8004489,
+    "area_km2": 47709.9,
+    "highest_point": {
+      "name": "Wurmberg",
+      "elevation_m": 971
+    },
+    "neighbour_count": 9
+  },
+  "DE-NW": {
+    "name": "Nordrhein-Westfalen",
+    "capital": "Düsseldorf",
+    "population": 18034454,
+    "area_km2": 34112.65,
+    "highest_point": {
+      "name": "Langenberg",
+      "elevation_m": 843
+    },
+    "neighbour_count": 3
+  },
+  "DE-RP": {
+    "name": "Rheinland-Pfalz",
+    "capital": "Mainz",
+    "population": 4129569,
+    "area_km2": 19857.96,
+    "highest_point": {
+      "name": "Erbeskopf",
+      "elevation_m": 816
+    },
+    "neighbour_count": 4
+  },
+  "DE-SL": {
+    "name": "Saarland",
+    "capital": "Saarbrücken",
+    "population": 1012141,
+    "area_km2": 2572.01,
+    "highest_point": {
+      "name": "Dollberg",
+      "elevation_m": 695
+    },
+    "neighbour_count": 1
+  },
+  "DE-SN": {
+    "name": "Sachsen",
+    "capital": "Dresden",
+    "population": 4042422,
+    "area_km2": 18449.89,
+    "highest_point": {
+      "name": "Fichtelberg",
+      "elevation_m": 1215
+    },
+    "neighbour_count": 4
+  },
+  "DE-ST": {
+    "name": "Sachsen-Anhalt",
+    "capital": "Magdeburg",
+    "population": 2135597,
+    "area_km2": 20554.84,
+    "highest_point": {
+      "name": "Brocken",
+      "elevation_m": 1141
+    },
+    "neighbour_count": 4
+  },
+  "DE-SH": {
+    "name": "Schleswig-Holstein",
+    "capital": "Kiel",
+    "population": 2959517,
+    "area_km2": 15804.31,
+    "highest_point": {
+      "name": "Bungsberg",
+      "elevation_m": 167
+    },
+    "neighbour_count": 3
+  },
+  "DE-TH": {
+    "name": "Thüringen",
+    "capital": "Erfurt",
+    "population": 2100277,
+    "area_km2": 16202.39,
+    "highest_point": {
+      "name": "Großer Beerberg",
+      "elevation_m": 983
+    },
+    "neighbour_count": 5
+  }
+}

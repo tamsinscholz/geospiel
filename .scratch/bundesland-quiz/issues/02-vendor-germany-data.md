@@ -30,19 +30,19 @@ Reference: `SOURCES.md`, and `.scratch/bundesland-quiz/spec.md` — "Bundesland 
 
 **Blocked by:** None — can start immediately. Runs in parallel with 01.
 
-**Status:** ready-for-agent
+**Status:** done — landed with commit "Vendor the Germany data for the Bundesland quiz"
 
 ### Acceptance criteria
 
-- [ ] The Bundesländer geometry contains **exactly 16** features, each keyed by its ISO 3166-2 code
-- [ ] The NUTS-1 → ISO 3166-2 mapping is verified against the **actually fetched** feature properties, not the published classification, and the warning on that table in `SOURCES.md` is removed
-- [ ] Eurostat GISCO attribution text is written into `SOURCES.md`, closing the gap flagged there
-- [ ] Kulisse geometry exists, covers the surround at the fitted Germany extent, and does not duplicate German territory
-- [ ] All 16 Landeswappen are vendored, run through `svgo`, and named by the ISO key lowercased
-- [ ] Each Wappen is checked to **read clearly at roughly 56px** — several are the greater or mid-level arms and are not uniform in complexity; report which ones needed a simpler variant, if any
-- [ ] Metadata exists for all 16 with every field populated: name, Landeshauptstadt, Fläche, Einwohner, höchster Punkt (name and metres), Nachbarländer count
-- [ ] Nachbarländer counts are sanity-checked against the Stadtstaaten, which are the easy ones to get wrong: Berlin has 1, Bremen has 1, Hamburg has 2
-- [ ] A structural check confirms the three sets agree: every geometry key has metadata and a Wappen, every metadata key has geometry, and there are no orphans in either direction
-- [ ] Population and area figures carry their source and reference date, so they can be refreshed later without re-deriving where they came from
-- [ ] **No npm dependency is added to the project** and no build step is introduced; the generation recipe is documented well enough to re-run by hand
-- [ ] `make test` still passes
+- [x] The Bundesländer geometry contains **exactly 16** features, each keyed by its ISO 3166-2 code
+- [x] The NUTS-1 → ISO 3166-2 mapping is verified against the **actually fetched** feature properties, not the published classification, and the warning on that table in `SOURCES.md` is removed
+- [x] Eurostat GISCO attribution text is written into `SOURCES.md`, closing the gap flagged there
+- [x] Kulisse geometry exists, covers the surround at the fitted Germany extent, and does not duplicate German territory
+- [x] All 16 Landeswappen are vendored, run through `svgo`, and named by the ISO key lowercased
+- [x] Each Wappen is checked to **read clearly at roughly 56px** — several are the greater or mid-level arms and are not uniform in complexity; report which ones needed a simpler variant, if any
+- [x] Metadata exists for all 16 with every field populated: name, Landeshauptstadt, Fläche, Einwohner, höchster Punkt (name and metres), Nachbarländer count
+- [x] Nachbarländer counts are sanity-checked against the Stadtstaaten, which are the easy ones to get wrong: Berlin has 1, Bremen has 1, Hamburg has 2
+- [x] A structural check confirms the three sets agree: every geometry key has metadata and a Wappen, every metadata key has geometry, and there are no orphans in either direction
+- [x] Population and area figures carry their source and reference date, so they can be refreshed later without re-deriving where they came from
+- [x] **No npm dependency is added to the project** and no build step is introduced; the generation recipe is documented well enough to re-run by hand
+- [x] `make test` still passes
