@@ -24,7 +24,7 @@ Single-page vanilla JS application — no bundler, no npm.
 
 | File | Purpose |
 |---|---|
-| `index.html` | Markup for the SVG map (Kulisse, Bundesland and hit-target groups), the (i) data credits, overlay screens (select, settings, stats), game panel, info panel, text input. Loads D3 and topojson-client from CDN |
+| `index.html` | Markup for the SVG map (Kulisse, Bundesland and hit-target groups), overlay screens (the Einstellungen card also carries the data credits) (select, settings, stats), game panel, info panel, text input. Loads D3 and topojson-client from CDN |
 | `main.js` | The browser shell — D3 map setup, zoom, DOM rendering, timers, event wiring, data loading, `localStorage`. Loaded as an ES module |
 | `game-core.mjs` | The game's rules, pure: round order, guess accounting, answer matching. Imports nothing, touches no DOM/D3/`localStorage`/timers. The only module under test |
 | `test/game-core.test.mjs` | Tests for `game-core.mjs` — `node --test`, `node:assert`, synthetic fixtures |
@@ -43,11 +43,8 @@ Single-page vanilla JS application — no bundler, no npm.
 | `Makefile` | `install` / `run` / `test` / `clean` / `clean-all` |
 
 Data sources and their required credits are documented in `SOURCES.md`; the credits
-are shown in a popover behind the (i) button (`#btn-credits`), the first item of the
-bottom panel stack, so it always sits just above whichever bottom panel is open. CSS
-shows the popover on hover (`@media (hover: hover)`), `:focus-visible` or
-`[aria-expanded="true"]`; JS only flips `aria-expanded` (click toggles, a pointerdown
-elsewhere closes). `LICENSE` excludes the third-party files in `data/` and `wappen/`.
+are shown in small muted text below the Einstellungen buttons (`#settings-credits`),
+collapsed to the short note "Karten: © EuroGeographics, Einwohner und Fläche: Destatis …"; a click, tap or Enter shows the full wording (`aria-expanded`), and it collapses again each time the Einstellungen screen opens. `LICENSE` excludes the third-party files in `data/` and `wappen/`.
 
 **Dependencies (all via CDN):**
 - D3.js v7 — SVG rendering, projections, zoom behavior

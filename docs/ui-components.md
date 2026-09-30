@@ -66,10 +66,6 @@ are German.
   panel. Tapping another switches. Tapping the same one, or anything that is not a
   `.bundesland`/`.hit-target` (sea, letterbox, Kulisse), dismisses it.
 
-### Data credits: the (i) button (`#credits`, `#btn-credits`, `#credits-popover`)
-
-See section 4d. The credits live in the bottom panel stack, not on the map.
-
 ---
 
 ## 2. Overlay Screens
@@ -112,6 +108,12 @@ and `stats`).
     18px white knob slides 20px. 0.2s transitions
 - **Actions (`.settings-actions`):** right-aligned, 12px gap, 24px top margin:
   "Zurück" (secondary), "Spiel starten" (primary)
+- **Credits (`#settings-credits.settings-credits`):** below the actions, 16px top margin,
+  0.68rem, `#aaa`, line-height 1.4. Holds the two credits required by `SOURCES.md` §2 and
+  §7 ("Kartengrundlage: © EuroGeographics bezüglich der Verwaltungsgrenzen" / "Einwohner
+  und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024"),
+  collapsed to the short note "Karten: © EuroGeographics, Einwohner und Fläche: Destatis …"; a click, tap or Enter shows the full wording (`aria-expanded`), and it collapses again each time the Einstellungen screen opens. It is a `<p role="button" tabindex="0">`; the short and full texts
+  are two spans (`.credits-short`, `.credits-full`) toggled by CSS.
 
 ### 2c. Spiel beendet (`#screen-stats`)
 
@@ -159,7 +161,7 @@ right-aligned.
 
 - **Position:** fixed, bottom 16px, horizontally centred, `width: calc(100% - 32px)`,
   max-width 860px, `z-index: 10`
-- **Layout:** flex column, 8px gap, top to bottom: the (i) credits button, the feedback
+- **Layout:** flex column, 8px gap, top to bottom: the feedback
   bar, then whichever content panel is showing. The container is `pointer-events: none`
   and its children are `auto`, so the gaps don't block the map.
 
@@ -213,44 +215,6 @@ one column), with radius `16px 16px 0 0`.
     - **"Antworten" (`#btn-submit`):** primary. Enter in the field also submits
 
 **Mobile (≤600px):** radius `16px 16px 0 0`, flush with the bottom edge.
-
-### 4d. Data credits: the (i) button (`#credits`)
-
-- **Wrapper (`.credits`):** the first item in the stack, `align-self: flex-start`, so it
-  is only as big as the button. It sits at the stack's left edge, just above whichever
-  bottom panel is open, or at the stack's bottom edge when none is, so it never overlaps
-  a panel. It has an 8px bottom margin at ≤600px, where the stack is flush with the
-  screen edge. Measured positions (top-left of the button):
-
-  | Viewport | No bottom panel | Input panel | Feedback + info panel |
-  |---|---|---|---|
-  | 1440×900 | 290, 860 (Erkunden: 764) | 290, 753 | 290, 708 |
-  | 1000×800 | 70, 760 | 70, 653 | 70, 608 |
-  | 400×800 | 16, 768 | 16, 616 | 16, 476 |
-  | 320×640 | 16, 608 | 16, 456 | 16, 316 |
-
-  The menu, Einstellungen and Spiel beendet overlays (`z-index: 100`) cover it, together
-  with the map.
-- **Button (`#btn-credits.credits-btn`):** a real `<button>`, `aria-label="Quellenangaben"`,
-  `aria-expanded`, `aria-controls="credits-popover"`. A 24px circle with a serif italic
-  "i", `#6b7684` on translucent white, 1px `#b8c2cc` border and a faint shadow. A
-  `::before` with `inset: -5px` gives a 34px hit area.
-- **Popover (`#credits-popover.credits-popover`):** absolutely positioned above the
-  button (`bottom: calc(100% + 6px)`), `max-width: min(300px, 100vw - 32px)`, white card,
-  0.7rem `#555`. It is always `pointer-events: none`, so it never intercepts the map.
-  Holds the two credits required by `SOURCES.md` §2 and §7:
-  - "Kartengrundlage: © EuroGeographics bezüglich der Verwaltungsgrenzen"
-  - "Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024"
-- **Visibility (CSS):** shown by `.credits-btn:focus-visible + .credits-popover`,
-  `.credits-btn[aria-expanded="true"] + .credits-popover`, and `:hover` only inside
-  `@media (hover: hover)`, so a touch tap can't leave a sticky hover open.
-- **JS:** a click toggles `aria-expanded`, and a `pointerdown` anywhere outside the
-  button sets it to `false`. The button's own `pointerdown` is `preventDefault`ed, which
-  suppresses the tap's compatibility mousedown/mouseup. In Erkunden a tap's `mouseleave`
-  closes the info panel and the button drops down mid-tap; without this the click would
-  land on the map. The button is outside the SVG, so its clicks never reach the map's
-  handlers. As with any tap or pointer move off a Bundesland, reaching the button in
-  Erkunden closes the hover or tap info panel.
 
 ---
 

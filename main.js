@@ -27,6 +27,7 @@ import { createGame } from './game-core.mjs';
   const valRounds      = $('val-rounds');
   const valGuesses     = $('val-guesses');
   const chkAuto        = $('chk-auto');
+  const settingsCredits = $('settings-credits');
 
   /* === Constants === */
   const MODE_LABELS = {
@@ -421,6 +422,8 @@ import { createGame } from './game-core.mjs';
     valRounds.textContent = gameState.totalRounds;
     valGuesses.textContent = gameState.maxGuesses;
     chkAuto.checked = gameState.autoAdvance;
+    // The credits start collapsed every time the screen opens
+    settingsCredits.setAttribute('aria-expanded', 'false');
     setScreen('settings');
   }
 
@@ -674,20 +677,12 @@ import { createGame } from './game-core.mjs';
     // Stats screen
     $('btn-back-menu').addEventListener('click', returnToMenu);
 
-    // Credits (i): a click toggles, a pointer-down anywhere else closes. CSS
-    // shows the popover off aria-expanded. The button is outside the SVG, so
-    // its clicks never reach the map's handlers.
-    const btnCredits = $('btn-credits');
-    // Suppress the tap's compatibility mousedown/mouseup. In Erkunden the
-    // tap's mouseleave closes the info panel and the button, stacked above
-    // it, drops down mid-tap; without this the click then lands on the map.
-    btnCredits.addEventListener('pointerdown', (e) => e.preventDefault());
-    btnCredits.addEventListener('click', () => {
-      const open = btnCredits.getAttribute('aria-expanded') === 'true';
-      btnCredits.setAttribute('aria-expanded', String(!open));
-    });
-    document.addEventListener('pointerdown', (e) => {
-      if (!btnCredits.contains(e.target)) btnCredits.setAttribute('aria-expanded', 'false');
+    // Settings credits: CSS shows the short note or the full wording off
+    // aria-expanded; click or Enter expands, openSettings() collapses
+    const expandCredits = () => settingsCredits.setAttribute('aria-expanded', 'true');
+    settingsCredits.addEventListener('click', expandCredits);
+    settingsCredits.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); expandCredits(); }
     });
   }
 

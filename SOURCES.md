@@ -398,8 +398,8 @@ both Bremen and Bremerhaven lie inside Niedersachsen), Hamburg 2 (NI, SH).
 **Blocking the current spec (§2, §5):** none open.
 
 1. ~~Eurostat GISCO attribution text has not been written.~~ **Closed** — written in §2
-   ("Attribution"). The app shows it, and the Destatis credit (§7), behind the (i)
-   button above the bottom panels (`#btn-credits` in `index.html`); see gap 5.
+   ("Attribution"). The app shows it, and the Destatis credit (§7), below the buttons of
+   the Einstellungen screen (`#settings-credits` in `index.html`); see gap 5.
 2. ~~The NUTS-1 → ISO 3166-2 mapping is written from the published classification.~~
    **Closed** — verified against the fetched file's `NUTS_ID`/`NAME_LATN` (§2).
 
@@ -428,6 +428,12 @@ both Bremen and Bremerhaven lie inside Niedersachsen), Hamburg 2 (NI, SH).
    publication using the data. A compact (i) attribution is common practice for web maps
    (e.g. Leaflet's and Mapbox's compact attribution controls), but whether it satisfies
    "visible" is a judgement call, made here by the maintainer.
+   **Changed again (2026-09-30):** the maintainer found the (i) distracting. The credits
+   now sit in small muted text below the Einstellungen buttons, collapsed to the short note "Karten: © EuroGeographics, Einwohner und Fläche: Destatis …"; a click, tap or Enter shows the full wording (`aria-expanded`), and it collapses again each time the Einstellungen screen opens.
+   They are therefore not on screen during play or in Erkunden, where the population
+   figures are shown; only on the Einstellungen screen before each quiz game. That is a
+   further step from GISCO's "visible" wording and from §7's "wherever population figures
+   are shown", taken deliberately by the maintainer for a non-commercial learning app.
 6. ~~**`LICENSE` (CC BY-NC 4.0, © Krautlabs Inc.) does not exclude the third-party data.**~~
    **Resolved** — `LICENSE` now has a "Third-party material" section after the unchanged
    CC BY-NC text. It says the geometry and the Bundesland facts in `data/`, and the

@@ -14,12 +14,6 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
 - Pan and zoom by drag, scroll wheel or pinch, in every mode. The scale range is 1×–6×,
   where 1× is the full-Germany view. Panning is clamped to Germany plus a thin margin, so
   at 1× the map cannot move at all.
-- **Credits:** a small (i) button ("Quellenangaben") at the left edge of the bottom
-  panels, just above whichever one is open. Hovering it (mouse), focusing it (keyboard)
-  or tapping it shows "Kartengrundlage: © EuroGeographics bezüglich der
-  Verwaltungsgrenzen" and "Einwohner und Fläche: Statistisches Bundesamt (Destatis),
-  Gemeindeverzeichnis, Stand 31.12.2024". Tapping it again, or anywhere else, closes it.
-  Pressing it never counts as a map click.
 - **Touch halo:** on touch or narrow screens (`(pointer: coarse), (max-width: 600px)`),
   the three Bundesländer under 1,000 km² (Berlin, Bremen, Hamburg) also catch taps up to
   about 10 screen px outside their outline. A tap there counts as a tap on that
@@ -85,6 +79,10 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
 | "Automatisch weiter" | toggle | on/off | off |
 
 - Buttons "Zurück" and "Spiel starten".
+- Below them, in small muted text, the data credits "Kartengrundlage: © EuroGeographics
+  bezüglich der Verwaltungsgrenzen" and "Einwohner und Fläche: Statistisches Bundesamt
+  (Destatis), Gemeindeverzeichnis, Stand 31.12.2024", collapsed to the short note "Karten: © EuroGeographics, Einwohner und Fläche: Destatis …"; a click, tap or Enter shows the full wording (`aria-expanded`), and it collapses again each time the Einstellungen screen opens.
+  They appear only here, not on the map.
 
 The values are remembered while the page is open: they are saved when a game starts and
 shown again the next time this screen opens, for any mode.

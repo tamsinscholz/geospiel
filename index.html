@@ -44,17 +44,6 @@
 
   <!-- Bottom Panel Stack -->
   <div class="bottom-panels">
-    <!-- Data credits (required by SOURCES.md §2 and §7) behind an (i) button.
-         First in the stack, so it always sits just above whichever bottom
-         panel is open and never overlaps one. CSS shows the popover. -->
-    <div id="credits" class="credits">
-      <button id="btn-credits" class="credits-btn" type="button"
-              aria-label="Quellenangaben" aria-expanded="false" aria-controls="credits-popover">i</button>
-      <div id="credits-popover" class="credits-popover" role="note">
-        <div>Kartengrundlage: &copy; EuroGeographics bezüglich der Verwaltungsgrenzen</div>
-        <div>Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024</div>
-      </div>
-    </div>
     <!-- Feedback Bar -->
     <div id="feedback-bar" class="panel feedback-bar">
       <span id="feedback-text"></span>
@@ -150,6 +139,15 @@
         <button id="btn-back-settings" class="btn btn-secondary">Zurück</button>
         <button id="btn-start" class="btn btn-primary">Spiel starten</button>
       </div>
+      <!-- Data credits (required by SOURCES.md §2 and §7): a short note, and the
+           full wording once clicked or Enter is pressed; collapsed again each
+           time this screen opens -->
+      <p id="settings-credits" class="settings-credits" role="button" tabindex="0"
+         aria-expanded="false" aria-label="Quellenangaben">
+        <span class="credits-short">Karten: &copy; EuroGeographics, Einwohner und Fläche: Destatis</span>
+        <span class="credits-full">Kartengrundlage: &copy; EuroGeographics bezüglich der Verwaltungsgrenzen<br>
+        Einwohner und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024</span>
+      </p>
     </div>
   </div>
 
