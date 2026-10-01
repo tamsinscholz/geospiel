@@ -1,11 +1,14 @@
 import { createGame, landmarkPool, landmarkType, followRounds } from './game-core.mjs';
 import { nearestLandmark } from './landmark-hit.mjs';
+import { screenToViewBox, intersectExtents, fitBounds } from './view-fit.mjs';
 
 (() => {
   /* === DOM References === */
   const $ = id => document.getElementById(id);
   const body = document.body;
 
+  const gamePanel      = $('game-panel');
+  const bottomPanels   = document.querySelector('.bottom-panels');
   const gameWappen     = $('game-wappen');
   const gamePrompt     = $('game-prompt');
   const gamePromptType = $('game-prompt-type');
@@ -377,24 +380,46 @@ import { nearestLandmark } from './landmark-hit.mjs';
     return feature ? pathGenerator.bounds(feature) : null;
   }
 
+  /** The part of the viewBox the user can see, as an extent in viewBox
+   *  units: below the top game panel and above the bottom panel stack, as
+   *  they are laid out right now. Reading the layout makes it exact for the
+   *  phase just set, so call it after setPhase. Outside a quiz round (the
+   *  menu, Erkunden) it is the whole viewBox: Erkunden's info panel comes and
+   *  goes with the pointer and doesn't count. Panels in a letterbox, off the
+   *  viewBox, take nothing away. */
+  function visibleArea() {
+    const full = viewBoxExtent();
+    const ctm = svgNode.getScreenCTM();
+    if (!ctm || gameState.phase === 'idle') return full;
+    const map = svgNode.getBoundingClientRect();
+    let top = map.top;
+    let bottom = map.bottom;
+    if (gamePanel.getClientRects().length) top = Math.max(top, gamePanel.getBoundingClientRect().bottom);
+    for (const panel of bottomPanels.children) {
+      if (panel.getClientRects().length) bottom = Math.min(bottom, panel.getBoundingClientRect().top);
+    }
+    // Panels covering the whole height (a tiny window) leave nothing to fit
+    // into; fall back to the whole viewBox rather than an empty area
+    const area = bottom > top &&
+      intersectExtents(screenToViewBox([[map.left, top], [map.right, bottom]], ctm), full);
+    return area && area[1][1] > area[0][1] ? area : full;
+  }
+
   /** The gentle zoom: fit projected `bounds` (`[[x0, y0], [x1, y1]]`, viewBox
-   *  units) at 0.9 of the viewBox, capped at TARGET_ZOOM_MAX. A point's zero
-   *  bounds simply hit the cap. */
+   *  units) at 0.9 of the visible area, centred in it, capped at
+   *  TARGET_ZOOM_MAX. A point's zero bounds simply hit the cap. Never below
+   *  the overview: in a very short window a large target fits only partly.
+   *  The visible area depends on the phase's panels, so call it after
+   *  setPhase. */
   function zoomToBounds(bounds, duration = 750) {
     if (!bounds) return;
-    const [[x0, y0], [x1, y1]] = bounds;
-    const dx = x1 - x0;
-    const dy = y1 - y0;
-    const x = (x0 + x1) / 2;
-    const y = (y0 + y1) / 2;
-    const scale = Math.min(TARGET_ZOOM_MAX, 0.9 / Math.max(dx / viewBox.width, dy / viewBox.height));
-    const tx = viewBox.x + viewBox.width / 2 - scale * x;
-    const ty = viewBox.y + viewBox.height / 2 - scale * y;
+    const { k, x, y } = fitBounds(bounds, visibleArea(),
+      { fill: 0.9, minScale: MIN_ZOOM, maxScale: TARGET_ZOOM_MAX });
 
     // zoom.transform does not apply the pan clamp by itself, so constrain the
     // target the same way a drag would be constrained.
     const target = zoom.constrain()(
-      d3.zoomIdentity.translate(tx, ty).scale(scale), viewBoxExtent(), zoom.translateExtent());
+      d3.zoomIdentity.translate(x, y).scale(k), viewBoxExtent(), zoom.translateExtent());
     d3.select('#map').transition().duration(duration)
       .call(zoom.transform, target);
   }
@@ -495,12 +520,22 @@ import { nearestLandmark } from './landmark-hit.mjs';
 
     renderLandmarks();
 
-    // The zoom extent defaults to the viewBox; making the translate extent the
-    // same rectangle leaves no pan at k = 1 and clamps to Germany plus the
-    // padding margin at every higher k.
-    zoom = d3.zoom()
+    // The zoom extent defaults to the viewBox, and the translate extent is the
+    // same rectangle: Germany plus the padding margin. d3's own clamp keeps
+    // the translate extent covering the whole viewBox. Ours only asks it to
+    // cover the visible area (visibleArea()), so Germany's top and bottom
+    // edges can move out from under the panels: extra room equal to the
+    // panels' height, in screen px, at every k. With no panels showing that
+    // is d3's clamp exactly, and at rest the overview (k = 1, no translation)
+    // satisfies both. It applies to drags, wheel and pinch, and to the
+    // programmatic travels, which call zoom.constrain() themselves.
+    zoom = d3.zoom();
+    const clampToArea = zoom.constrain();
+    zoom
       .scaleExtent([MIN_ZOOM, MAX_ZOOM])
       .translateExtent(viewBoxExtent())
+      .constrain((transform, extent, translateExtent) =>
+        clampToArea(transform, visibleArea(), translateExtent))
       // d3's smooth zoom breaks down when the two views are centred almost,
       // but not exactly, on the same point (e.g. resetting after a wheel zoom
       // at the map's centre): its duration comes out non-finite and every
@@ -845,7 +880,8 @@ import { nearestLandmark } from './landmark-hit.mjs';
     // round, is tiring. They return to the overview only if the user has
     // zoomed in themselves (at k = 1 the reset changes nothing), which in
     // Bundesland finden also keeps the start un-zoomed, so the map gives
-    // nothing away. Gewässer & Städte finden is one of these.
+    // nothing away. Gewässer & Städte finden is one of these. The travel
+    // comes after setPhase, so it fits the target above the input panel.
     if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
     else if (gameState.mode === 'name-landmark') zoomToBounds(landmarkBounds(id));
     else resetZoom();
@@ -901,14 +937,16 @@ import { nearestLandmark } from './landmark-hit.mjs';
       fillBundeslandInfo(id);
       highlightTarget(id);
     }
-    // Re-centre on the target only where the round is already zoomed to it
-    if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
-    else if (gameState.mode === 'name-landmark') zoomToBounds(landmarkBounds(id));
     hudScore.textContent = state.score;
     // The round is complete once it reaches feedback
     renderProgress(state.currentRound + 1, state.totalRounds);
 
     setPhase('feedback');
+
+    // Re-centre on the target only where the round is already zoomed to it,
+    // fitting it above the feedback bar and the info panel, now laid out
+    if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
+    else if (gameState.mode === 'name-landmark') zoomToBounds(landmarkBounds(id));
 
     if (gameState.autoAdvance) {
       gameState.advanceTimer = setTimeout(advanceRound, 1800);

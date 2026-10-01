@@ -29,7 +29,7 @@ are German.
   side, with `preserveAspectRatio="xMidYMid meet"`. CSS sizes the SVG and the browser
   fits and centres Germany, so no JS resize handler is needed. Wide or tall screens
   letterbox, and the Kulisse fills the letterbox. All zoom and pan arithmetic, including
-  the zoom-to-target centring, is in viewBox units.
+  the zoom-to-target centring and the visible area, is in viewBox units.
 - **Layers** (inside one zoomed `<g id="map-group">`, bottom to top):
   1. `#kulisse-group`: **Kulisse**, one `.kulisse` path per neighbouring country
      (`data/kulisse.topo.json`). Muted fill `#e3e3de`, stroke `#cfcfc8` 0.5px,
@@ -50,12 +50,27 @@ are German.
   same screen thickness at every zoom level.
 - **Zoom:** D3 zoom (drag, wheel, pinch), scale range **[1, 6]**, where `k = 1` is the
   full-Germany view. Applied as a `transform` on `#map-group`.
-- **Pan clamp:** `translateExtent` is the viewBox rectangle itself, so at `k = 1` there is
-  nothing to pan and at higher `k` the view stays inside Germany plus the 20-unit
-  margin. Programmatic zooms go through `zoom.constrain()` with the same extent.
+- **Visible area (`visibleArea()`):** the part of the viewBox the user can see, in viewBox
+  units: below the game panel's bottom edge and above the topmost showing child of the
+  bottom stack, as laid out at the time of the call (so it is called after `setPhase`),
+  converted from screen px through the SVG's screen CTM (`screenToViewBox` in
+  `view-fit.mjs`, which takes the letterbox offset `e`/`f` into account), then
+  intersected with the viewBox. Panels in a letterbox take nothing away. In the `idle`
+  phase (menu, Erkunden) it is the whole viewBox.
+- **Pan clamp:** `translateExtent` is the viewBox rectangle itself, and a custom
+  `zoom.constrain()` runs d3's default clamp with the visible area as the viewport
+  instead of the whole viewBox. So the viewBox only has to cover the visible area:
+  Germany's top and bottom edges can move out from under the panels, by the panels'
+  height in screen px at every `k`, also at `k = 1`. With no panels showing (the menu,
+  Erkunden) this is the old clamp exactly: nothing to pan at `k = 1`, Germany plus the
+  20-unit margin at higher `k`. The overview at rest (`k = 1`, no translation) satisfies
+  both, so it looks the same. Drags, wheel and pinch use it, and programmatic zooms call
+  `zoom.constrain()` themselves.
 - **Gentle zoom (`zoomToBounds(bounds)`):** 750 ms transition to fit projected bounds at
-  0.9 of the viewBox, capped at `TARGET_ZOOM_MAX = 1.8` (a point's zero bounds hit the
-  cap). Used in Landeshauptstadt benennen, with the Bundesland's bounds, and in Gewässer
+  0.9 of the visible area, centred in it, capped at `TARGET_ZOOM_MAX = 1.8` (a point's
+  zero bounds hit the cap) and floored at `k = 1` (`fitBounds` in `view-fit.mjs`), then
+  clamped. It runs after `setPhase`, so it fits above the input panel while playing and
+  above the feedback bar and info panel in feedback. Used in Landeshauptstadt benennen, with the Bundesland's bounds, and in Gewässer
   & Städte benennen, with the feature's (`landmarkBounds(id)`: a river's or lake's
   `pathGenerator.bounds`, a city's point as zero bounds), at round start and in feedback.
   `resetZoom` animates back to `k = 1` in 300 ms.

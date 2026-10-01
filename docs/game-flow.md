@@ -12,8 +12,11 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
 - Around it, the **Kulisse**: the neighbouring countries in a muted fill. It is scenery
   only and never highlights, never counts as a click, and is never an answer.
 - Pan and zoom by drag, scroll wheel or pinch, in every mode. The scale range is 1×–6×,
-  where 1× is the full-Germany view. Panning is clamped to Germany plus a thin margin, so
-  at 1× the map cannot move at all.
+  where 1× is the full-Germany view. Panning is clamped to Germany plus a thin margin,
+  widened at the top and bottom by the panels showing there (the game panel and the
+  bottom stack, during a quiz round): Germany's edges can be pulled out from under them,
+  even at 1×. With no panels (the menu, Erkunden) the map cannot move at 1×. At rest the
+  overview is the same either way.
 - **Touch halo:** on touch or narrow screens (`(pointer: coarse), (max-width: 600px)`),
   the three Bundesländer under 1,000 km² (Berlin, Bremen, Hamburg) also catch taps up to
   about 10 screen px outside their outline. A tap there counts as a tap on that
@@ -139,11 +142,14 @@ modes. The four toggles show only for a landmark mode (CSS off `data-settings-mo
   the full-Germany overview. If the user has zoomed in, it returns to the overview (300 ms); at 1× nothing
   moves.
 - **Landeshauptstadt benennen, Gewässer & Städte benennen:** gentle zoom to the target
-  (750 ms). The scale fits the Bundesland, or the feature's projected bounds, at 0.9 of
-  the view but is capped at 1.8×, so a small target still shows most of Germany around
-  it. Lakes and cities (a point has no extent) always hit the cap; the longest rivers
-  stop just short of it (Elbe 1.51×, Donau 1.56×, Rhein 1.63×). The pan clamp applies to
-  this too.
+  (750 ms), into the **visible area**: the part of the map between the game panel and the
+  input panel, so the target never ends up under either. The scale fits the Bundesland,
+  or the feature's projected bounds, at 0.9 of that area but is capped at 1.8× (and never
+  goes below 1×), so a small target still shows most of Germany around it. Lakes and
+  cities (a point has no extent) always hit the cap; the longest rivers stop short of it
+  (at 1440×900: Elbe 1.51×, Donau 1.56×, Rhein 1.30×). The target is centred in the
+  visible area as far as the widened pan clamp allows: a target at Germany's edge (the
+  Bodensee, Kiel) sits nearer that edge of the area, but clear of the panel.
 
 **User actions available in every quiz mode:**
 - **Überspringen** (playing only): counts the round as skipped and goes straight to the
@@ -285,7 +291,9 @@ it sits on a river (Köln, Mainz, Dresden). Ties go city, then lake, then river.
   the landmark modes it is orange (in Gewässer & Städte finden it turns orange only now) (a river 4 px over a white casing, a lake
   filled, a city dot 6 px), and a lake or city gets an orange ring of 18 screen px.
 - **Zoom:** only Landeshauptstadt benennen and Gewässer & Städte benennen re-centre on
-  the target (750 ms, capped at 1.8×), bringing it back if the user zoomed or panned away. Bundesland finden, Bundesland benennen and Gewässer & Städte finden stay where
+  the target (750 ms, capped at 1.8×), bringing it back if the user zoomed or panned away.
+  They fit it into the visible area above the feedback bar and the info panel, which
+  are taller than the input panel, so the map usually moves up a little. Bundesland finden, Bundesland benennen and Gewässer & Städte finden stay where
   they are, which is the overview unless the user has zoomed in.
 
 **Automatisch weiter off:** a "Weiter →" button in the feedback bar, focused after
