@@ -8,7 +8,7 @@ are German.
 
 ## Global Styling
 
-- **Background:** light blue-grey (`#e8f4f8`). This is also the sea, since there is no water geometry.
+- **Background:** light blue-grey (`#e8f4f8`). This is also the sea: the only water geometry is the rivers and lakes of the landmark modes.
 - **Font:** Inter (Google Fonts), fallback `system-ui, sans-serif`
 - **Language:** `<html lang="de">`. Page title "Deutschland-Quiz".
 - **Overflow:** hidden on `html` and `body`, so the page never scrolls
@@ -38,6 +38,8 @@ are German.
   2. `#bundesland-group`: one `.bundesland` path per Bundesland, `data-id` = ISO 3166-2
      key (`DE-BY`)
   3. `#hit-group`: `.hit-target` touch halos (see below)
+  4. `#river-group`, 5. `#lake-group`, 6. `#city-group`, 7. `#marker-group`: the
+     landmark layers (`.landmark-layer`, see below)
 - **Bundesland paths (`.bundesland`):**
   - Default: grey fill (`#ccc`), stroke `#666` 0.75px, pointer cursor
   - Erkunden hover/tap (`.highlighted`): orange fill (`#f90`), red stroke (`#c00`, 1.5px)
@@ -51,8 +53,9 @@ are German.
 - **Pan clamp:** `translateExtent` is the viewBox rectangle itself, so at `k = 1` there is
   nothing to pan and at higher `k` the view stays inside Germany plus the 20-unit
   margin. Programmatic zooms go through `zoom.constrain()` with the same extent.
-- **Gentle zoom (`zoomToBundesland`):** 750 ms transition to fit the target at 0.9 of the
-  viewBox, capped at `TARGET_ZOOM_MAX = 1.8`. Used only in Landeshauptstadt benennen.
+- **Gentle zoom (`zoomToBounds(bounds)`):** 750 ms transition to fit projected bounds at
+  0.9 of the viewBox, capped at `TARGET_ZOOM_MAX = 1.8` (a point's zero bounds hit the
+  cap). Used only in Landeshauptstadt benennen, with the Bundesland's bounds.
   `resetZoom` animates back to `k = 1` in 300 ms.
 - **Touch halo (`.hit-target`):** for each Bundesland with `area_km2` below
   `SMALL_TARGET_MAX_AREA_KM2 = 1000` (Berlin, Bremen, Hamburg), a duplicate path of its
@@ -62,6 +65,29 @@ are German.
   10 screen px beyond the outline at every zoom. Its handlers resolve `data-id` to the
   real `.bundesland` path, so highlights, the wrong-guess flash and scoring land on the
   visible shape. A mouse on a wide screen never sees it.
+- **Landmark layers (`.landmark-layer`):** `display: none` unless `data-mode` ends in
+  `-landmark` and `data-phase` is `playing` or `feedback`; `pointer-events: none` always,
+  since clicks and hover are resolved by distance in `main.js` (`nearestLandmark`, 12
+  screen px). Pool and background features share every style.
+  - **River (`<g class="landmark river" data-id>`):** a `.river-line` path, 1.5px
+    `#3a78c2`, round joins and caps, over a `.river-casing` path (white, 7px) that only
+    shows for the target
+  - **Lake (`path.landmark.lake`):** fill `#a9cdee`, edge `#3a78c2` 0.75px
+  - **City (`circle.landmark.city`):** `#444` dot of 3.5 screen px radius with a 1px white rim
+  - **Hover (`.hovered`, Gewässer & Städte finden, mouse only):** faint orange: river
+    line `#f6b45c` 2.5px, lake fill `#fbd7a6`, dot `#f6b45c`
+  - **Wrong click (`.wrong-guess`):** the Bundesland flash colours, `#e05555` (river line
+    3px; lake and dot edged `#a02020`), removed after 600 ms
+  - **Target (`.target`, orange `#f28c00`):** river line 4px over its white casing,
+    raised above the other rivers; lake filled (edge `#b86a00`); city dot 6 screen px
+  - **Marker (`circle.marker`, `#marker-group`):** around a lake (its `d3.geoPath`
+    centroid) or city target only: an orange ring, 2px stroke, no fill, 18 screen px
+    radius
+  - **Constant screen size:** strokes are non-scaling; the dot and marker radii are set
+    in viewBox units by the zoom handler (`sizeLandmarks()`: screen px ÷ px per viewBox
+    unit ÷ `k`)
+- **Bundesländer in the landmark modes** (playing or feedback): quieter fill `#e6e6e2`,
+  stroke `#9a9a94`, `pointer-events: none`, no hover; the touch halos are inert.
 - **Touch interaction (Erkunden):** tapping a Bundesland highlights it and opens the info
   panel. Tapping another switches. Tapping the same one, or anything that is not a
   `.bundesland`/`.hit-target` (sea, letterbox, Kulisse), dismisses it.
@@ -81,13 +107,15 @@ and `stats`).
 - **Card (`.overlay-card`):** white (`rgba(255,255,255,0.97)`), 20px radius, 36px/40px
   padding, max-width 760px, heavy drop shadow
 - **Title:** "Deutschland-Quiz", 1.6rem, bold 700, centred, 24px bottom margin
-- **Mode cards grid (`.mode-cards`):** 2×2 grid, 16px gap
+- **Mode cards grid (`.mode-cards`):** 2-column grid, 16px gap; five cards in three
+  rows (the sixth, `name-landmark`, is `hidden`: `.mode-card[hidden] { display: none }`)
 - **Each mode card (`.mode-card`, `data-mode-choice`):** column flex, left-aligned,
   background `#f4f8fc`, 2px border `#dde6f0`, 12px radius, 20px padding. Hover: `#e6f0fa`
   background, `#4a90d9` border
-  - **Icon (`.mode-icon`):** emoji, 1.8rem (🗺️ 🔍 ✏️ 🏛️)
+  - **Icon (`.mode-icon`):** emoji, 1.8rem (🗺️ 🔍 ✏️ 🏛️ 🌊 🏞️)
   - **Name (`.mode-name`):** 1rem, bold 700: "Erkunden", "Bundesland finden",
-    "Bundesland benennen", "Landeshauptstadt benennen"
+    "Bundesland benennen", "Landeshauptstadt benennen", "Gewässer & Städte finden",
+    "Gewässer & Städte benennen"
   - **Description (`.mode-desc`):** 0.82rem, `#666`
 - **Footer (`.overlay-footer`):** 0.75rem, `#999`, centred: GitHub icon + "Quellcode auf
   GitHub" (link to `https://github.com/jan-scholz/geospiel`) · "© 2026 Krautlabs Inc."
@@ -99,20 +127,27 @@ and `stats`).
 - **Card:** narrow variant (`.overlay-card--narrow`, max-width 420px)
 - **Title (`#settings-title`):** the mode's name, e.g. "Bundesland finden"
 - **Rows (`.settings-row`):** flex, space-between, 12px vertical padding, 1px `#eee` bottom border
+  - **Type toggle rows (`.settings-row--type`):** "Flüsse", "Seen", "Städte",
+    "Landeshauptstädte", above Runden; `display: none` unless
+    `body[data-settings-mode$="-landmark"]`. Each is a `.toggle` around
+    `input.chk-type[data-type]` (`river`, `lake`, `city`, `capital`)
   - **Label (`.settings-label`):** 0.95rem, bold 600, `#333`: "Runden", "Versuche pro
     Runde", "Automatisch weiter"
   - **Stepper (`.stepper`):** 12px gap. Buttons (`.stepper-btn`) 32×32px, 8px radius,
     `#f0f0f0`, hover `#ddd`. Value (`.stepper-val`) 1rem bold, min-width 28px. Runden
-    1–16 (default 16), Versuche 1–10 (default 3)
+    1–16 (default 16), or in the landmark modes 1–the selected pool size (default 25);
+    Versuche 1–10 (default 3)
   - **Toggle (`.toggle`):** 44×24px custom checkbox. Track `#ccc`, checked `#3a7bd5`.
     18px white knob slides 20px. 0.2s transitions
 - **Actions (`.settings-actions`):** right-aligned, 12px gap, 24px top margin:
   "Zurück" (secondary), "Spiel starten" (primary)
 - **Credits (`#settings-credits.settings-credits`):** below the actions, 16px top margin,
-  0.68rem, `#aaa`, line-height 1.4. Holds the two credits required by `SOURCES.md` §2 and
-  §7 ("Kartengrundlage: © EuroGeographics bezüglich der Verwaltungsgrenzen" / "Einwohner
+  0.68rem, `#aaa`, line-height 1.4. Holds the credits required by `SOURCES.md` §2, §3/§4
+  and §7 ("Kartengrundlage: © EuroGeographics bezüglich der Verwaltungsgrenzen" /
+  "Gewässer und Städte: © OpenStreetMap-Mitwirkende, ODbL", the link opening
+  `https://www.openstreetmap.org/copyright` in a new tab / "Einwohner
   und Fläche: Statistisches Bundesamt (Destatis), Gemeindeverzeichnis, Stand 31.12.2024"),
-  collapsed to the short note "Karten: © EuroGeographics, Einwohner und Fläche: Destatis …"; a click, tap or Enter shows the full wording (`aria-expanded`), and it collapses again each time the Einstellungen screen opens. It is a `<p role="button" tabindex="0">`; the short and full texts
+  collapsed to the short note "Karten: © EuroGeographics, © OpenStreetMap, Einwohner und Fläche: Destatis …"; a click, tap or Enter shows the full wording (`aria-expanded`), and it collapses again each time the Einstellungen screen opens. It is a `<p role="button" tabindex="0">`; the short and full texts
   are two spans (`.credits-short`, `.credits-full`) toggled by CSS.
 
 ### 2c. Spiel beendet (`#screen-stats`)
@@ -140,10 +175,14 @@ and `stats`).
   `object-fit: contain`, no background or border, so a portrait coat of arms is never
   cropped. Generic alt text "Landeswappen", because the name is the answer in Bundesland
   benennen. Hidden in Landeshauptstadt benennen
-  (`body[data-mode="name-capital"] #game-wappen-wrap`) and at ≤600px.
+  (`body[data-mode="name-capital"] #game-wappen-wrap`), in the landmark modes
+  (`body[data-mode$="-landmark"]`) and at ≤600px.
 - **Prompt (`#game-prompt`):** the Bundesland's name, 1.1rem, bold 700. In Bundesland
   benennen it is `visibility: hidden` while `data-phase="playing"` and shown in feedback.
-  It keeps its space, so the layout does not jump.
+  It keeps its space, so the layout does not jump. In Gewässer & Städte finden it is the
+  feature's name.
+- **Type label (`#game-prompt-type`):** under the prompt, 0.8rem, `#888`: "Fluss", "See",
+  "Stadt" or "Landeshauptstadt". Shown only in `find-landmark`.
 - **HUD (`.game-hud`):** flex, 12px gap, nowrap. "Punkte: n", "Versuche: n" (`.hud-item`,
   0.9rem, `#444`, value in `<strong>`), "Überspringen" (secondary small, hidden during
   feedback: `body[data-phase="feedback"] #btn-skip`), "Beenden" (danger small)
@@ -175,6 +214,18 @@ right-aligned.
   `body[data-auto-advance="on"] #btn-next`
 - **Visibility:** `display: flex` when `data-phase="feedback"`
 
+### 4a′. Wrong-click line (`#click-feedback.click-feedback`)
+
+- **Style:** `.panel` with a 12px radius, 10px/20px padding, text as `#input-feedback`
+  (0.88rem, red `#c03030`, bold 600): "Falsch – das war {Artikel Name} · noch {n}
+  Versuche"
+- **Visibility:** `display: block` only when `data-mode="find-landmark"`,
+  `data-phase="playing"` and it has text (`:not(:empty)`); emptied at each round start
+- **Pointer events:** none, so a click on the map under it (it can sit over the
+  Bodensee) still reaches the map
+
+**Mobile (≤600px):** radius `16px 16px 0 0`, flush with the bottom edge.
+
 ### 4b. Info Panel (`#country-panel`)
 
 - **Layout:** grid `auto 1fr 2fr`: Landeswappen | identity | facts. 12px/16px gap
@@ -191,6 +242,14 @@ right-aligned.
     and the value (`.fact-value`) is bold, right-aligned and nowrap. Fields:
     "Fläche" (`{n} km²`), "Einwohner", "Höchster Punkt" (`{Name} ({n} m)`),
     "Nachbarländer" (count of adjacent Bundesländer)
+- **Per kind (`data-kind`):** `bundesland` (above), or in Gewässer & Städte finden
+  `river`, `lake`, `city`. Each `.fact` lists the kinds it belongs to in `data-kinds`,
+  and CSS hides the rest: river "Länge"; lake "Fläche" (one decimal), "Größte Tiefe",
+  "Bundesland"; city "Einwohner", "Bundesland". The name line carries the article ("der
+  Rhein"). "Landeshauptstadt: {city}" is Bundesland-only; a Landeshauptstadt shows
+  "Landeshauptstadt von {Bundesland}" (`#info-capital-of`, hidden when empty) instead.
+- **Wappen slot (`data-wappen`):** `shown`, or `none` for rivers and lakes in more than one
+  Bundesland (the Bodensee): the slot is hidden and the grid becomes `1fr 2fr`.
 
 **Mobile (≤600px):** the stack sits at `bottom: 0` with `left/right: 16px` and no
 centring transform. The info panel is one centred column (Landeswappen centred, facts in

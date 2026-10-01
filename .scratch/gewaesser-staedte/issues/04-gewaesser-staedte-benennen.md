@@ -38,3 +38,11 @@ Reference: `.scratch/gewaesser-staedte/spec.md`: "Zoom", "Rendering" (target and
   - the ring's radius mid-transition and at rest
   - accepted and rejected inputs, including "die Rhein" and "der"
   - a full game with the default toggles
+
+## Comments
+
+**From ticket 03's review (2026-10-01).** The `name-landmark` menu card already exists in
+`index.html` with the `hidden` attribute; remove it here, and tick ticket 03's open
+"six cards" criterion when this lands. The shared Einstellungen, layers, marker,
+`highlightLandmark()` and `zoomToBounds()` already handle both landmark modes.
+`data/landmark-aliases.json` is not yet loaded by `main.js`.

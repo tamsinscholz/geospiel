@@ -18,7 +18,10 @@
   </defs></svg>
 
   <!-- SVG Map -->
-  <svg id="map" preserveAspectRatio="xMidYMid meet"><g id="map-group"><g id="kulisse-group"></g><g id="bundesland-group"></g><g id="hit-group"></g></g></svg>
+  <!-- Layers bottom to top. The landmark groups (rivers, lakes, cities, the
+       marker) show only in the landmark modes while playing or in feedback
+       (CSS); they take no pointer events, landmark-hit.mjs resolves clicks -->
+  <svg id="map" preserveAspectRatio="xMidYMid meet"><g id="map-group"><g id="kulisse-group"></g><g id="bundesland-group"></g><g id="hit-group"></g><g id="river-group" class="landmark-layer"></g><g id="lake-group" class="landmark-layer"></g><g id="city-group" class="landmark-layer"></g><g id="marker-group" class="landmark-layer"></g></g></svg>
 
   <!-- Explore Quit Button -->
   <button id="btn-menu" class="btn btn-danger btn-sm">Beenden</button>
@@ -30,6 +33,7 @@
     </div>
     <div class="panel-identity">
       <div id="game-prompt"></div>
+      <div id="game-prompt-type"></div>
     </div>
     <div class="game-hud">
       <span class="hud-item">Punkte: <strong id="hud-score">0</strong></span>
@@ -50,20 +54,28 @@
       <button id="btn-next" class="btn btn-primary btn-sm">Weiter &rarr;</button>
     </div>
 
-    <!-- Country Info Panel -->
-    <div id="country-panel" class="panel country-panel">
+    <!-- Wrong-click line (Gewässer & Städte finden): shown while it has text -->
+    <div id="click-feedback" class="panel click-feedback"></div>
+
+    <!-- Country Info Panel: data-kind (bundesland, river, lake, city) picks
+         the rows, data-wappen="none" collapses the Wappen slot (CSS) -->
+    <div id="country-panel" class="panel country-panel" data-kind="bundesland">
       <div class="panel-wappen">
         <img id="info-wappen" alt="Landeswappen" />
       </div>
       <div class="panel-identity">
         <div class="panel-name" id="info-name"></div>
         <div class="panel-capital"><span class="fact-label">Landeshauptstadt</span> <span id="info-capital"></span></div>
+        <div class="panel-capital-of" id="info-capital-of"></div>
       </div>
       <div class="panel-facts" id="info-facts">
-        <div class="fact"><span class="fact-label">Fläche</span><span class="fact-value" id="info-area"></span></div>
-        <div class="fact"><span class="fact-label">Einwohner</span><span class="fact-value" id="info-pop"></span></div>
-        <div class="fact"><span class="fact-label">Höchster Punkt</span><span class="fact-value" id="info-peak"></span></div>
-        <div class="fact"><span class="fact-label">Nachbarländer</span><span class="fact-value" id="info-neighbours"></span></div>
+        <div class="fact" data-kinds="river"><span class="fact-label">Länge</span><span class="fact-value" id="info-length"></span></div>
+        <div class="fact" data-kinds="bundesland lake"><span class="fact-label">Fläche</span><span class="fact-value" id="info-area"></span></div>
+        <div class="fact" data-kinds="bundesland city"><span class="fact-label">Einwohner</span><span class="fact-value" id="info-pop"></span></div>
+        <div class="fact" data-kinds="lake"><span class="fact-label">Größte Tiefe</span><span class="fact-value" id="info-depth"></span></div>
+        <div class="fact" data-kinds="lake city"><span class="fact-label">Bundesland</span><span class="fact-value" id="info-bundesland"></span></div>
+        <div class="fact" data-kinds="bundesland"><span class="fact-label">Höchster Punkt</span><span class="fact-value" id="info-peak"></span></div>
+        <div class="fact" data-kinds="bundesland"><span class="fact-label">Nachbarländer</span><span class="fact-value" id="info-neighbours"></span></div>
       </div>
     </div>
 
@@ -103,6 +115,17 @@
           <span class="mode-name">Landeshauptstadt benennen</span>
           <span class="mode-desc">Die Landeshauptstadt des Bundeslandes eingeben</span>
         </button>
+        <button class="mode-card" data-mode-choice="find-landmark">
+          <span class="mode-icon">&#127754;</span>
+          <span class="mode-name">Gewässer &amp; Städte finden</span>
+          <span class="mode-desc">Flüsse, Seen und Städte auf der Karte anklicken</span>
+        </button>
+        <!-- Hidden until its gameplay lands (ticket 04 removes `hidden`) -->
+        <button class="mode-card" data-mode-choice="name-landmark" hidden>
+          <span class="mode-icon">&#127966;&#65039;</span>
+          <span class="mode-name">Gewässer &amp; Städte benennen</span>
+          <span class="mode-desc">Den markierten Fluss, See oder die markierte Stadt benennen</span>
+        </button>
       </div>
       <div class="overlay-footer"><a href="https://github.com/jan-scholz/geospiel" target="_blank" rel="noopener"><svg class="gh-icon"><use href="#icon-github"/></svg> Quellcode auf GitHub</a> · &copy; 2026 Krautlabs Inc.</div>
     </div>
@@ -112,6 +135,23 @@
   <div id="screen-settings" class="overlay-screen">
     <div class="overlay-card overlay-card--narrow">
       <h1 class="overlay-title" id="settings-title"></h1>
+      <!-- Type toggles: landmark modes only (CSS off data-settings-mode) -->
+      <div class="settings-row settings-row--type">
+        <span class="settings-label">Flüsse</span>
+        <label class="toggle"><input type="checkbox" class="chk-type" data-type="river" /><span class="toggle-track"></span></label>
+      </div>
+      <div class="settings-row settings-row--type">
+        <span class="settings-label">Seen</span>
+        <label class="toggle"><input type="checkbox" class="chk-type" data-type="lake" /><span class="toggle-track"></span></label>
+      </div>
+      <div class="settings-row settings-row--type">
+        <span class="settings-label">Städte</span>
+        <label class="toggle"><input type="checkbox" class="chk-type" data-type="city" /><span class="toggle-track"></span></label>
+      </div>
+      <div class="settings-row settings-row--type">
+        <span class="settings-label">Landeshauptstädte</span>
+        <label class="toggle"><input type="checkbox" class="chk-type" data-type="capital" /><span class="toggle-track"></span></label>
+      </div>
       <div class="settings-row">
         <span class="settings-label">Runden</span>
         <div class="stepper">

@@ -7,6 +7,9 @@ import {
   matchBundesland,
   matchCapital,
   matchLandmark,
+  landmarkType,
+  landmarkPool,
+  followRounds,
 } from '../game-core.mjs';
 
 /* === Fixtures ===
@@ -539,4 +542,49 @@ test('a click on a background feature that is not an item costs a guess in find-
   assert.strictEqual(result.guessesLeft, 2);
   assert.strictEqual(result.phase, 'playing');
   assert.strictEqual(game.state.score, 0);
+});
+
+/* === The landmark pool and Runden === */
+
+const poolFixture = {
+  R1: { type: 'river', name: 'Rhein', pool: true },
+  R2: { type: 'river', name: 'Saale', pool: false },
+  S1: { type: 'lake', name: 'Chiemsee', pool: true },
+  C1: { type: 'city', name: 'Köln', pool: true },
+  K1: { type: 'city', name: 'Mainz', pool: true, capital_of: 'X1' },
+  K2: { type: 'city', name: 'Kiel', pool: true, capital_of: 'X2' },
+};
+
+test('cities split into Städte and Landeshauptstädte by capital_of', () => {
+  assert.strictEqual(landmarkType(poolFixture.R1), 'river');
+  assert.strictEqual(landmarkType(poolFixture.S1), 'lake');
+  assert.strictEqual(landmarkType(poolFixture.C1), 'city');
+  assert.strictEqual(landmarkType(poolFixture.K1), 'capital');
+});
+
+test('the landmark pool holds the pool features of the selected types only', () => {
+  const items = landmarkPool(poolFixture, { river: true, lake: false, city: true, capital: false });
+  assert.deepStrictEqual(Object.keys(items).sort(), ['C1', 'R1']);
+  assert.strictEqual(items.R1, poolFixture.R1);
+});
+
+test('the landmark pool never holds a background feature', () => {
+  const items = landmarkPool(poolFixture, { river: true, lake: true, city: true, capital: true });
+  assert.deepStrictEqual(Object.keys(items).sort(), ['C1', 'K1', 'K2', 'R1', 'S1']);
+});
+
+test('the landmark pool leaves out features without geometry', () => {
+  const items = landmarkPool(poolFixture, { capital: true }, id => id !== 'K2');
+  assert.deepStrictEqual(Object.keys(items), ['K1']);
+});
+
+test('a Runden value at the old maximum follows the new maximum', () => {
+  assert.strictEqual(followRounds(25, 25, 41), 41);
+  assert.strictEqual(followRounds(25, 25, 7), 7);
+});
+
+test('any other Runden value is clamped to the new maximum', () => {
+  assert.strictEqual(followRounds(10, 25, 41), 10);
+  assert.strictEqual(followRounds(20, 25, 7), 7);
+  assert.strictEqual(followRounds(5, 25, 7), 5);
 });

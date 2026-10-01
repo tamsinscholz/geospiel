@@ -1,4 +1,5 @@
-import { createGame } from './game-core.mjs';
+import { createGame, landmarkPool, landmarkType, followRounds } from './game-core.mjs';
+import { nearestLandmark } from './landmark-hit.mjs';
 
 (() => {
   /* === DOM References === */
@@ -7,6 +8,7 @@ import { createGame } from './game-core.mjs';
 
   const gameWappen     = $('game-wappen');
   const gamePrompt     = $('game-prompt');
+  const gamePromptType = $('game-prompt-type');
   const hudScore       = $('hud-score');
   const hudGuesses     = $('hud-guesses');
   const progressFill   = $('progress-fill');
@@ -21,19 +23,41 @@ import { createGame } from './game-core.mjs';
   const infoPop        = $('info-pop');
   const infoPeak       = $('info-peak');
   const infoNeighbours = $('info-neighbours');
+  const infoCapitalOf  = $('info-capital-of');
+  const infoLength     = $('info-length');
+  const infoDepth      = $('info-depth');
+  const infoBundesland = $('info-bundesland');
   const inputFeedback  = $('input-feedback');
+  const clickFeedback  = $('click-feedback');
   const guessInput     = $('guess-input');
   const settingsTitle  = $('settings-title');
   const valRounds      = $('val-rounds');
   const valGuesses     = $('val-guesses');
   const chkAuto        = $('chk-auto');
   const settingsCredits = $('settings-credits');
+  const typeToggles    = [...document.querySelectorAll('.chk-type')];
 
   /* === Constants === */
   const MODE_LABELS = {
     'find': 'Bundesland finden',
     'name-bundesland': 'Bundesland benennen',
     'name-capital': 'Landeshauptstadt benennen',
+    'find-landmark': 'Gewässer & Städte finden',
+    'name-landmark': 'Gewässer & Städte benennen',
+  };
+
+  /** The two landmark modes (rivers, lakes, cities). CSS matches them as
+   *  `[data-mode$="-landmark"]`. */
+  function isLandmarkMode(mode) {
+    return mode === 'find-landmark' || mode === 'name-landmark';
+  }
+
+  /** The type label under a landmark's name, by `landmarkType()`. */
+  const TYPE_LABELS = {
+    river: 'Fluss',
+    lake: 'See',
+    city: 'Stadt',
+    capital: 'Landeshauptstadt',
   };
 
   /** Zoom range; `k = 1` is the full-Germany view. */
@@ -52,6 +76,17 @@ import { createGame } from './game-core.mjs';
 
   /** Padding around Germany's projected bounds, in viewBox units. */
   const MAP_PADDING = 20;
+
+  /** Landmark sizes in screen px, constant at every zoom: a city dot, a target
+   *  dot, the marker ring's radius, and the hit radius around every drawn
+   *  feature (landmark-hit.mjs). `unitsPerPx()` turns them into viewBox units. */
+  const CITY_DOT_PX = 3.5;
+  const CITY_TARGET_PX = 6;
+  const MARKER_PX = 18;
+  const HIT_RADIUS_PX = 12;
+
+  /** How long a wrongly clicked Bundesland or landmark flashes red. */
+  const WRONG_FLASH_MS = 600;
 
   /** Settings ranges. Runden caps at the sixteen Bundesländer. */
   const ROUNDS_MAX = 16;
@@ -76,6 +111,11 @@ import { createGame } from './game-core.mjs';
     phase: 'idle',
     screen: 'select',
     totalRounds: ROUNDS_MAX,
+    // The landmark modes' Runden, kept apart from the Bundesland modes'; null
+    // until a landmark game starts, meaning "the selected pool size"
+    landmarkRounds: null,
+    // The Einstellungen type toggles, shared by both landmark modes
+    landmarkTypes: { river: true, lake: true, city: true, capital: false },
     maxGuesses: 3,
     autoAdvance: false,
     advanceTimer: null,
@@ -109,9 +149,16 @@ import { createGame } from './game-core.mjs';
   let aliasesData = {};
   let geoFeatures = [];
   let kulisseFeatures = [];
+  let landmarksData = {};
+  let riverFeatures = [];
+  let lakeFeatures = [];
+  let cityFeatures = [];
+  /** Every landmark projected once into viewBox units, as the resolver's
+   *  records (`{ id, kind, lines | polygons | point }`, see landmark-hit.mjs). */
+  let landmarkRecords = [];
 
   /* === D3 Globals === */
-  let projection, pathGenerator, zoom, g;
+  let projection, pathGenerator, zoom, g, svgNode;
 
   /** The padded projected bounds of Germany: the SVG's fixed viewBox, and the
    *  pan clamp. All map, zoom and pan arithmetic happens in these units. */
@@ -129,9 +176,16 @@ import { createGame } from './game-core.mjs';
   }
 
   const numberFormat = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+  const decimalFormat = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   function formatNumber(n) {
     return numberFormat.format(n);
+  }
+
+  /** A landmark with its article, nominative as stored: "der Main", "Köln". */
+  function landmarkTitle(id) {
+    const r = landmarksData[id];
+    return r.article ? `${r.article} ${r.name}` : r.name;
   }
 
   /** "1 Versuch" / "3 Versuche" — German number agreement, never "1 Versuche". */
@@ -156,12 +210,78 @@ import { createGame } from './game-core.mjs';
       .classed('highlighted', false)
       .classed('target', false)
       .classed('wrong-guess', false);
+    d3.selectAll('.landmark')
+      .classed('target', false)
+      .classed('hovered', false)
+      .classed('wrong-guess', false);
+    hoveredLandmarkId = null;
+    setMarker(null);
   }
 
   /** The visible Bundesland path for an id. Hits on a `.hit-target` halo are
    *  resolved through this, so map classes always land on the real shape. */
   function bundeslandPath(id) {
     return document.querySelector(`.bundesland[data-id="${id}"]`);
+  }
+
+  /** The drawn element of a landmark: a river's `<g>`, a lake's path, a city's dot. */
+  function landmarkElement(id) {
+    return document.querySelector(`.landmark[data-id="${id}"]`);
+  }
+
+  /** Flash a wrongly clicked map element in the `.wrong-guess` colours. */
+  function flashWrong(el) {
+    d3.select(el).classed('wrong-guess', true);
+    setTimeout(() => d3.select(el).classed('wrong-guess', false), WRONG_FLASH_MS);
+  }
+
+  /** Mark a landmark target in orange, raised above its neighbours, with the
+   *  marker ring around a lake or city (rivers get none). */
+  function highlightLandmark(id) {
+    d3.selectAll('.landmark').classed('target', d => featureId(d) === id);
+    d3.select(landmarkElement(id)).raise();
+    setMarker(landmarkCentre(id));
+    sizeLandmarks();
+  }
+
+  /** Where the marker ring goes: a city's dot or a lake's centroid; null for a river. */
+  function landmarkCentre(id) {
+    const kind = landmarksData[id] && landmarksData[id].type;
+    if (kind === 'city') return landmarkRecords.find(r => r.id === id).point;
+    if (kind === 'lake') return pathGenerator.centroid(lakeFeatures.find(f => featureId(f) === id));
+    return null;
+  }
+
+  /** Draw the marker ring at `centre` (viewBox units), or remove it (null). */
+  function setMarker(centre) {
+    d3.select('#marker-group').selectAll('circle')
+      .data(centre ? [centre] : [])
+      .join('circle')
+      .attr('class', 'marker')
+      .attr('cx', c => c[0])
+      .attr('cy', c => c[1]);
+  }
+
+  /** Screen px per viewBox unit at k = 1: the fit of the viewBox to the SVG. */
+  function pxPerUnit() {
+    const ctm = svgNode.getScreenCTM();
+    return ctm ? ctm.a : 1;
+  }
+
+  /** ViewBox units per screen px at zoom `k`. */
+  function unitsPerPx(k = d3.zoomTransform(svgNode).k) {
+    return 1 / (pxPerUnit() * k);
+  }
+
+  /** Keep the city dots and the marker ring a constant screen size: an SVG
+   *  radius scales with the zoom (vector-effect only covers strokes), so the
+   *  zoom handler sets each radius in viewBox units for the current `k`. */
+  function sizeLandmarks(k) {
+    const u = unitsPerPx(k);
+    d3.selectAll('.city').attr('r', function () {
+      return (this.classList.contains('target') ? CITY_TARGET_PX : CITY_DOT_PX) * u;
+    });
+    d3.selectAll('.marker').attr('r', MARKER_PX * u);
   }
 
   function highlightTarget(id) {
@@ -180,6 +300,45 @@ import { createGame } from './game-core.mjs';
     infoPop.textContent = formatNumber(c.population);
     infoPeak.textContent = c.highest_point.name + ' (' + formatNumber(c.highest_point.elevation_m) + ' m)';
     infoNeighbours.textContent = c.neighbour_count;
+    countryPanel.dataset.kind = 'bundesland';
+    countryPanel.dataset.wappen = 'shown';
+  }
+
+  /** The info panel for a river, lake or city; CSS picks the rows off
+   *  `data-kind`. Cities show their Bundesland's Landeswappen, lakes only when
+   *  they lie in exactly one Bundesland; rivers and the Bodensee show none. */
+  function fillLandmarkInfo(id) {
+    const r = landmarksData[id];
+    if (!r) return;
+    const landName = key => bundeslaenderData[key] ? bundeslaenderData[key].name : key;
+
+    countryPanel.dataset.kind = r.type;
+    infoName.textContent = landmarkTitle(id);
+    infoCapitalOf.textContent = r.capital_of ? `Landeshauptstadt von ${landName(r.capital_of)}` : '';
+
+    let wappenKey = null;
+    if (r.type === 'river') {
+      infoLength.textContent = formatNumber(r.length_km) + ' km';
+    } else if (r.type === 'lake') {
+      infoArea.textContent = decimalFormat.format(r.area_km2) + ' km\u00B2';
+      infoDepth.textContent = formatNumber(r.max_depth_m) + ' m';
+      infoBundesland.textContent = r.bundeslaender.map(landName).join(', ');
+      if (r.bundeslaender.length === 1) wappenKey = r.bundeslaender[0];
+    } else if (r.type === 'city') {
+      infoPop.textContent = formatNumber(r.population);
+      infoBundesland.textContent = landName(r.bundesland);
+      wappenKey = r.bundesland;
+    }
+
+    if (wappenKey) {
+      infoWappen.src = wappenUrl(wappenKey);
+      infoWappen.alt = 'Landeswappen ' + landName(wappenKey);
+      countryPanel.dataset.wappen = 'shown';
+    } else {
+      infoWappen.removeAttribute('src');
+      infoWappen.alt = '';
+      countryPanel.dataset.wappen = 'none';
+    }
   }
 
   /** The viewBox as a d3 extent, `[[x0, y0], [x1, y1]]`. */
@@ -187,10 +346,18 @@ import { createGame } from './game-core.mjs';
     return [[viewBox.x, viewBox.y], [viewBox.x + viewBox.width, viewBox.y + viewBox.height]];
   }
 
-  function zoomToBundesland(id, duration = 750) {
+  /** A Bundesland's projected bounds, or null when it has no geometry. */
+  function bundeslandBounds(id) {
     const feature = geoFeatures.find(f => featureId(f) === id);
-    if (!feature) return;
-    const [[x0, y0], [x1, y1]] = pathGenerator.bounds(feature);
+    return feature ? pathGenerator.bounds(feature) : null;
+  }
+
+  /** The gentle zoom: fit projected `bounds` (`[[x0, y0], [x1, y1]]`, viewBox
+   *  units) at 0.9 of the viewBox, capped at TARGET_ZOOM_MAX. A point's zero
+   *  bounds simply hit the cap. */
+  function zoomToBounds(bounds, duration = 750) {
+    if (!bounds) return;
+    const [[x0, y0], [x1, y1]] = bounds;
     const dx = x1 - x0;
     const dy = y1 - y0;
     const x = (x0 + x1) / 2;
@@ -214,11 +381,14 @@ import { createGame } from './game-core.mjs';
 
   /* === Data Loading === */
   async function loadData() {
-    const [topology, kulisseTopology, bundeslaender, aliases] = await Promise.all([
+    const [topology, kulisseTopology, bundeslaender, aliases, gewaesserTopology, staedte, landmarks] = await Promise.all([
       d3.json('data/bundeslaender.topo.json'),
       d3.json('data/kulisse.topo.json'),
       d3.json('data/bundeslaender.json'),
       d3.json('data/bundesland-aliases.json'),
+      d3.json('data/gewaesser.topo.json'),
+      d3.json('data/staedte.json'),
+      d3.json('data/landmarks.json'),
     ]);
 
     bundeslaenderData = bundeslaender;
@@ -226,6 +396,10 @@ import { createGame } from './game-core.mjs';
     geoFeatures = topojson.feature(topology, topology.objects.bundeslaender).features;
     kulisseFeatures = topojson.feature(kulisseTopology, kulisseTopology.objects.kulisse).features;
     const germany = topojson.merge(topology, topology.objects.bundeslaender.geometries);
+    landmarksData = landmarks;
+    riverFeatures = topojson.feature(gewaesserTopology, gewaesserTopology.objects.rivers).features;
+    lakeFeatures = topojson.feature(gewaesserTopology, gewaesserTopology.objects.lakes).features;
+    cityFeatures = staedte.features;
 
     initMap(germany);
   }
@@ -233,6 +407,7 @@ import { createGame } from './game-core.mjs';
   /* === D3 Map Setup === */
   function initMap(germany) {
     const svg = d3.select('#map');
+    svgNode = svg.node();
     g = d3.select('#map-group');
 
     // Conic conformal with standard parallels inside Germany, centred on its
@@ -291,6 +466,8 @@ import { createGame } from './game-core.mjs';
       .on('mouseenter', onBundeslandEnter)
       .on('mouseleave', onBundeslandLeave);
 
+    renderLandmarks();
+
     // The zoom extent defaults to the viewBox; making the translate extent the
     // same rectangle leaves no pan at k = 1 and clamps to Germany plus the
     // padding margin at every higher k.
@@ -307,13 +484,21 @@ import { createGame } from './game-core.mjs';
       })
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
+        sizeLandmarks(event.transform.k);
       });
 
     svg.call(zoom);
+    sizeLandmarks(1);
 
-    // Click anywhere that is not a Bundesland (sea, letterbox, or the Kulisse,
-    // which lets clicks through) to dismiss the explore panel
     svg.on('click', (event) => {
+      // Gewässer & Städte finden: the landmark layers take no pointer events,
+      // so every click on the map lands here and is resolved by distance
+      if (gameState.mode === 'find-landmark' && gameState.phase === 'playing') {
+        handleLandmarkClick(landmarkAt(event));
+        return;
+      }
+      // Click anywhere that is not a Bundesland (sea, letterbox, or the Kulisse,
+      // which lets clicks through) to dismiss the explore panel
       if (!event.target.closest('.bundesland, .hit-target') && gameState.mode === 'explore') {
         d3.selectAll('.bundesland').classed('highlighted', false);
         countryPanel.classList.remove('visible');
@@ -321,7 +506,79 @@ import { createGame } from './game-core.mjs';
       }
     });
 
+    // Hover tint, mouse only: a touch has no hover, and a tap's pointermove
+    // would leave a stale tint behind
+    svg.on('pointermove.landmark', (event) => {
+      if (event.pointerType !== 'mouse') return;
+      if (gameState.mode !== 'find-landmark' || gameState.phase !== 'playing') return;
+      setHoveredLandmark(landmarkAt(event));
+    });
+    svg.on('pointerleave.landmark', () => setHoveredLandmark(null));
+
     wireEvents();
+  }
+
+  /** Draw every river, lake and city once (CSS decides when they show), and
+   *  project them into the resolver's records. Rivers are a `<g>` of a white
+   *  casing (shown only for the target) and the line itself. */
+  function renderLandmarks() {
+    d3.select('#river-group').selectAll('g')
+      .data(riverFeatures)
+      .join('g')
+      .attr('class', 'landmark river')
+      .attr('data-id', d => featureId(d))
+      .call(river => {
+        river.append('path').attr('class', 'river-casing').attr('d', pathGenerator);
+        river.append('path').attr('class', 'river-line').attr('d', pathGenerator);
+      });
+
+    d3.select('#lake-group').selectAll('path')
+      .data(lakeFeatures)
+      .join('path')
+      .attr('class', 'landmark lake')
+      .attr('data-id', d => featureId(d))
+      .attr('d', pathGenerator);
+
+    d3.select('#city-group').selectAll('circle')
+      .data(cityFeatures)
+      .join('circle')
+      .attr('class', 'landmark city')
+      .attr('data-id', d => featureId(d))
+      .attr('cx', d => projection(d.geometry.coordinates)[0])
+      .attr('cy', d => projection(d.geometry.coordinates)[1]);
+
+    const project = coords => coords.map(p => projection(p));
+    const lines = geom => geom.type === 'LineString' ? [geom.coordinates] : geom.coordinates;
+    const polygons = geom => geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
+    landmarkRecords = [
+      ...riverFeatures.map(f => ({
+        id: featureId(f), kind: 'river', lines: lines(f.geometry).map(project),
+      })),
+      ...lakeFeatures.map(f => ({
+        id: featureId(f), kind: 'lake', polygons: polygons(f.geometry).map(rings => rings.map(project)),
+      })),
+      ...cityFeatures.map(f => ({
+        id: featureId(f), kind: 'city', point: projection(f.geometry.coordinates),
+      })),
+    ];
+  }
+
+  /** The landmark a pointer event is on, or null: the event in viewBox units
+   *  (d3.pointer on #map-group inverts the zoom), radii from screen px. */
+  function landmarkAt(event) {
+    const u = unitsPerPx();
+    return nearestLandmark(d3.pointer(event, g.node()), landmarkRecords, {
+      radius: HIT_RADIUS_PX * u,
+      dotRadius: CITY_DOT_PX * u,
+    });
+  }
+
+  let hoveredLandmarkId = null;
+
+  function setHoveredLandmark(id) {
+    if (id === hoveredLandmarkId) return;
+    hoveredLandmarkId = id;
+    d3.selectAll('.landmark').classed('hovered', d => featureId(d) === id);
   }
 
   /* === Explore Mode === */
@@ -386,12 +643,34 @@ import { createGame } from './game-core.mjs';
     }
 
     hudGuesses.textContent = result.guessesLeft;
-    const pathEl = bundeslandPath(id);
-    d3.select(pathEl).classed('wrong-guess', true);
-    setTimeout(() => d3.select(pathEl).classed('wrong-guess', false), 600);
+    flashWrong(bundeslandPath(id));
 
     if (result.exhausted) {
       showFeedback(false);
+    }
+  }
+
+  /* === Gewässer & Städte finden === */
+  function handleLandmarkClick(id) {
+    // Nothing within reach (open land, sea, Kulisse, letterbox): no Versuch
+    if (id === null) return;
+    const result = game.guessById(id);
+    if (result.ignored) return;
+
+    if (result.correct) {
+      showFeedback(true);
+      return;
+    }
+
+    hudGuesses.textContent = result.guessesLeft;
+    flashWrong(landmarkElement(id));
+
+    if (result.exhausted) {
+      showFeedback(false);
+    } else {
+      // Every wrong click names what was hit, background features included
+      clickFeedback.textContent =
+        `Falsch \u2013 das war ${landmarkTitle(id)} \u00B7 noch ${versucheText(result.guessesLeft)}`;
     }
   }
 
@@ -416,10 +695,42 @@ import { createGame } from './game-core.mjs';
   }
 
   /* === Settings === */
+
+  /** Runden's current maximum: 16 for the Bundesland modes, the selected
+   *  pool size for the landmark modes. Kept in step by the type toggles. */
+  let roundsMax = ROUNDS_MAX;
+
+  /** The type toggles' current state, `{ river, lake, city, capital }`. */
+  function selectedTypes() {
+    const types = {};
+    for (const chk of typeToggles) types[chk.dataset.type] = chk.checked;
+    return types;
+  }
+
+  /** Landmarks with geometry: only they can be a round's target. */
+  function hasLandmarkGeometry(id) {
+    return landmarkRecords.some(r => r.id === id);
+  }
+
+  function landmarkItems(types) {
+    return landmarkPool(landmarksData, types, hasLandmarkGeometry);
+  }
+
   function openSettings(mode) {
     gameState.mode = mode;
+    // CSS shows the type toggles off this, for the landmark modes only
+    body.dataset.settingsMode = mode;
     settingsTitle.textContent = MODE_LABELS[mode];
-    valRounds.textContent = gameState.totalRounds;
+    if (isLandmarkMode(mode)) {
+      for (const chk of typeToggles) chk.checked = gameState.landmarkTypes[chk.dataset.type];
+      roundsMax = Math.max(1, Object.keys(landmarkItems(selectedTypes())).length);
+      valRounds.textContent = gameState.landmarkRounds === null
+        ? roundsMax
+        : Math.min(gameState.landmarkRounds, roundsMax);
+    } else {
+      roundsMax = ROUNDS_MAX;
+      valRounds.textContent = gameState.totalRounds;
+    }
     valGuesses.textContent = gameState.maxGuesses;
     chkAuto.checked = gameState.autoAdvance;
     // The credits start collapsed every time the screen opens
@@ -429,7 +740,7 @@ import { createGame } from './game-core.mjs';
 
   /* === Game Flow === */
   function startGame() {
-    gameState.totalRounds = parseInt(valRounds.textContent);
+    const rounds = parseInt(valRounds.textContent);
     gameState.maxGuesses = parseInt(valGuesses.textContent);
     gameState.autoAdvance = chkAuto.checked;
     // CSS hides Weiter off this attribute; it holds for the whole game
@@ -438,16 +749,25 @@ import { createGame } from './game-core.mjs';
     // Only Bundesländer that have geometry on the map can be a round's target.
     // Which ids have geometry is knowledge that belongs to this side of the
     // seam, so the filtering happens here and the game-core gets the result.
-    const items = {};
-    for (const id of Object.keys(bundeslaenderData)) {
-      if (geoFeatures.some(f => featureId(f) === id)) items[id] = bundeslaenderData[id];
+    // The landmark modes take the pool features of the selected types, with
+    // their own remembered Runden.
+    let items = {};
+    if (isLandmarkMode(gameState.mode)) {
+      gameState.landmarkRounds = rounds;
+      gameState.landmarkTypes = selectedTypes();
+      items = landmarkItems(gameState.landmarkTypes);
+    } else {
+      gameState.totalRounds = rounds;
+      for (const id of Object.keys(bundeslaenderData)) {
+        if (geoFeatures.some(f => featureId(f) === id)) items[id] = bundeslaenderData[id];
+      }
     }
 
     game = createGame({
       items,
       aliases: aliasesData,
       mode: gameState.mode,
-      totalRounds: gameState.totalRounds,
+      totalRounds: rounds,
       maxGuesses: gameState.maxGuesses,
     });
 
@@ -463,19 +783,27 @@ import { createGame } from './game-core.mjs';
 
     const state = game.state;
     const id = state.targetId;
-    const c = bundeslaenderData[id];
 
-    gameWappen.src = wappenUrl(id);
-    // Generic alt text: in Bundesland benennen the name is the answer, and a
-    // Wappen that fails to load would otherwise print it in the panel
-    gameWappen.alt = 'Landeswappen';
-    gamePrompt.textContent = c.name;
+    if (isLandmarkMode(gameState.mode)) {
+      // The name and its type ("Main" / "Fluss"); CSS hides the Wappen
+      const r = landmarksData[id];
+      gamePrompt.textContent = r.name;
+      gamePromptType.textContent = TYPE_LABELS[landmarkType(r)];
+    } else {
+      gameWappen.src = wappenUrl(id);
+      // Generic alt text: in Bundesland benennen the name is the answer, and a
+      // Wappen that fails to load would otherwise print it in the panel
+      gameWappen.alt = 'Landeswappen';
+      gamePrompt.textContent = bundeslaenderData[id].name;
+      gamePromptType.textContent = '';
+    }
     hudScore.textContent = state.score;
     hudGuesses.textContent = state.guessesLeft;
     renderProgress(state.currentRound, state.totalRounds);
 
     guessInput.value = '';
     inputFeedback.textContent = '';
+    clickFeedback.textContent = '';
     feedbackBar.classList.remove('feedback-bar--correct', 'feedback-bar--wrong');
 
     setPhase('playing');
@@ -485,8 +813,9 @@ import { createGame } from './game-core.mjs';
     // feedback and back out for the next round, every round, is tiring. They
     // return to the overview only if the user has zoomed in themselves (at
     // k = 1 the reset changes nothing), which in Bundesland finden also keeps
-    // the start un-zoomed, so the map gives nothing away.
-    if (gameState.mode === 'name-capital') zoomToBundesland(id);
+    // the start un-zoomed, so the map gives nothing away. Gewässer & Städte
+    // finden is one of these.
+    if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
     else resetZoom();
 
     if (gameState.mode === 'name-bundesland' || gameState.mode === 'name-capital') {
@@ -502,13 +831,15 @@ import { createGame } from './game-core.mjs';
   function showFeedback(correct) {
     const state = game.state;
     const id = state.targetId;
-    const c = bundeslaenderData[id];
+    const landmark = isLandmarkMode(gameState.mode);
 
     let answer;
-    if (gameState.mode === 'name-capital') {
-      answer = c.capital;
+    if (landmark) {
+      answer = landmarkTitle(id);
+    } else if (gameState.mode === 'name-capital') {
+      answer = bundeslaenderData[id].capital;
     } else {
-      answer = c.name;
+      answer = bundeslaenderData[id].name;
     }
 
     if (correct) {
@@ -521,10 +852,17 @@ import { createGame } from './game-core.mjs';
       feedbackBar.classList.remove('feedback-bar--correct');
     }
 
-    fillBundeslandInfo(id);
-    highlightTarget(id);
+    if (landmark) {
+      // Orange target and marker; Gewässer & Städte finden doesn't zoom
+      setHoveredLandmark(null);
+      fillLandmarkInfo(id);
+      highlightLandmark(id);
+    } else {
+      fillBundeslandInfo(id);
+      highlightTarget(id);
+    }
     // Re-centre on the target only where the round is already zoomed to it
-    if (gameState.mode === 'name-capital') zoomToBundesland(id);
+    if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
     hudScore.textContent = state.score;
     // The round is complete once it reaches feedback
     renderProgress(state.currentRound + 1, state.totalRounds);
@@ -651,12 +989,26 @@ import { createGame } from './game-core.mjs';
         const dir = parseInt(btn.dataset.dir);
         const valEl = setting === 'rounds' ? valRounds : valGuesses;
         const min = 1;
-        const max = setting === 'rounds' ? ROUNDS_MAX : GUESSES_MAX;
+        const max = setting === 'rounds' ? roundsMax : GUESSES_MAX;
         let val = parseInt(valEl.textContent) + dir;
         val = Math.max(min, Math.min(max, val));
         valEl.textContent = val;
       });
     });
+
+    // Type toggles: the last one on can't be switched off (the click is
+    // ignored); otherwise Runden's maximum follows the pool size
+    for (const chk of typeToggles) {
+      chk.addEventListener('click', (e) => {
+        if (!typeToggles.some(c => c.checked)) {
+          e.preventDefault();
+          return;
+        }
+        const newMax = Object.keys(landmarkItems(selectedTypes())).length;
+        valRounds.textContent = followRounds(parseInt(valRounds.textContent), roundsMax, newMax);
+        roundsMax = newMax;
+      });
+    }
 
     // Settings buttons
     $('btn-back-settings').addEventListener('click', () => setScreen('select'));

@@ -107,6 +107,42 @@ export function matchCapital(text, item) {
   return false;
 }
 
+/* === The landmark pool === */
+
+/**
+ * The Einstellungen type a landmark record belongs to: `'river'`, `'lake'`,
+ * `'city'` or `'capital'`. The Städte and Landeshauptstädte toggles split the
+ * cities by `capital_of`.
+ */
+export function landmarkType(record) {
+  if (record.type === 'city') return record.capital_of ? 'capital' : 'city';
+  return record.type;
+}
+
+/**
+ * The `items` for a landmark game: the pool features (`pool: true`) whose type
+ * is switched on in `types` (`{ river, lake, city, capital }` booleans) and
+ * for which `hasGeometry(id)` holds. Background features and deselected types
+ * are left out; they stay drawn and clickable, just never a target.
+ */
+export function landmarkPool(landmarks, types, hasGeometry = () => true) {
+  const items = {};
+  for (const [id, record] of Object.entries(landmarks || {})) {
+    if (record.pool && types && types[landmarkType(record)] && hasGeometry(id)) items[id] = record;
+  }
+  return items;
+}
+
+/**
+ * The Runden value after its maximum changes from `oldMax` to `newMax` (the
+ * type toggles changed the pool size): a value at the old maximum follows the
+ * new one, any other value is clamped to `1..newMax`.
+ */
+export function followRounds(value, oldMax, newMax) {
+  if (value === oldMax) return newMax;
+  return Math.max(1, Math.min(newMax, value));
+}
+
 /* === Round order === */
 
 /** Fisher-Yates, in place; the default when no `shuffle` is injected. */
