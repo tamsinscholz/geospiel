@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 
-import { normalize, matchBundesland } from '../game-core.mjs';
+import { normalize, matchLandmark } from '../game-core.mjs';
 
 /* === The landmark alias table ===
  *
@@ -10,10 +10,8 @@ import { normalize, matchBundesland } from '../game-core.mjs';
  * `data/landmarks.json`. It covers pool features only: background features
  * are never targets, so they need names but no aliases.
  *
- * Until `matchLandmark` exists (ticket 02 of .scratch/gewaesser-staedte), the
- * lookup goes through `matchBundesland`, which is the same canonical alias
- * lookup with a domain name; the article-stripping cases ("der Rhein",
- * "die Rhein") arrive with `matchLandmark`.
+ * Every lookup goes through `matchLandmark`, as the `name-landmark` mode does,
+ * so one leading article ("der Rhein", even a wrong "die Rhein") is accepted.
  */
 
 const root = new URL('../', import.meta.url);
@@ -29,7 +27,7 @@ const ARTICLE = /^(der|die|das)\s/i;
 /** Assert that every spelling in `spellings` matches landmark `id`. */
 function assertAllMatch(id, spellings) {
   for (const text of spellings) {
-    assert.strictEqual(matchBundesland(text, aliases), id, `${JSON.stringify(text)} -> ${id}`);
+    assert.strictEqual(matchLandmark(text, aliases), id, `${JSON.stringify(text)} -> ${id}`);
   }
 }
 
@@ -68,8 +66,23 @@ test('no two aliases normalise to the same string while pointing at different fe
 
 test('every pool feature is reachable by its own curated name', () => {
   for (const id of poolIds) {
-    assert.strictEqual(matchBundesland(landmarks[id].name, aliases), id, landmarks[id].name);
+    assert.strictEqual(matchLandmark(landmarks[id].name, aliases), id, landmarks[id].name);
   }
+});
+
+test('every pool feature with an article is reachable by its name with that article', () => {
+  const withArticle = poolIds.filter(id => landmarks[id].article);
+  assert.ok(withArticle.length > 0);
+  for (const id of withArticle) {
+    const text = `${landmarks[id].article} ${landmarks[id].name}`;
+    assert.strictEqual(matchLandmark(text, aliases), id, text);
+  }
+});
+
+test('a wrong article is accepted and the bare article matches nothing', () => {
+  assert.strictEqual(matchLandmark('der Rhein', aliases), 'river-rhein');
+  assert.strictEqual(matchLandmark('die Rhein', aliases), 'river-rhein');
+  assert.strictEqual(matchLandmark('der', aliases), null);
 });
 
 test('no two of the 53 feature names canonicalise to the same string', () => {
@@ -89,19 +102,19 @@ test('no feature name or alias starts with an article', () => {
 
 test('Main and Mainz stay distinct', () => {
   assert.notStrictEqual(normalize('Main'), normalize('Mainz'));
-  assert.strictEqual(matchBundesland('Main', aliases), 'river-main');
-  assert.strictEqual(matchBundesland('Mainz', aliases), 'city-mainz');
+  assert.strictEqual(matchLandmark('Main', aliases), 'river-main');
+  assert.strictEqual(matchLandmark('Mainz', aliases), 'city-mainz');
 });
 
 test('Elbe and Ems stay distinct', () => {
   assert.notStrictEqual(normalize('Elbe'), normalize('Ems'));
-  assert.strictEqual(matchBundesland('Elbe', aliases), 'river-elbe');
-  assert.strictEqual(matchBundesland('Ems', aliases), 'river-ems');
+  assert.strictEqual(matchLandmark('Elbe', aliases), 'river-elbe');
+  assert.strictEqual(matchLandmark('Ems', aliases), 'river-ems');
 });
 
 test('Schwerin and the Schweriner See stay distinct', () => {
-  assert.strictEqual(matchBundesland('Schwerin', aliases), 'city-schwerin');
-  assert.strictEqual(matchBundesland('Schweriner See', aliases), 'lake-schweriner-see');
+  assert.strictEqual(matchLandmark('Schwerin', aliases), 'city-schwerin');
+  assert.strictEqual(matchLandmark('Schweriner See', aliases), 'lake-schweriner-see');
 });
 
 /* === Short forms and exonyms (spec, "Answer matching and aliases") === */
@@ -137,8 +150,8 @@ test('the Stadtstaaten are cities here', () => {
 
 test('background features, Frankfurt (Oder) and the bare article match nothing', () => {
   for (const [, r] of records.filter(([, r]) => !r.pool)) {
-    assert.strictEqual(matchBundesland(r.name, aliases), null, r.name);
+    assert.strictEqual(matchLandmark(r.name, aliases), null, r.name);
   }
-  assert.strictEqual(matchBundesland('Frankfurt (Oder)', aliases), null);
-  assert.strictEqual(matchBundesland('der', aliases), null);
+  assert.strictEqual(matchLandmark('Frankfurt (Oder)', aliases), null);
+  assert.strictEqual(matchLandmark('der', aliases), null);
 });

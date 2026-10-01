@@ -31,14 +31,32 @@ Reference: `.scratch/gewaesser-staedte/spec.md`: "Hit-testing", "Rounds, guesses
 
 **Blocked by:** none. It can run in parallel with 01.
 
-**Status:** ready-for-agent
+**Status:** done
 
 ### Acceptance criteria
 
-- [ ] `matchLandmark` accepts the bare name, the right article and a wrong article; rejects the bare article alone and empty input; leaves names untouched where the article is merely a prefix of a word ("Dieburg" isn't stripped)
-- [ ] `guessByText` in `name-landmark`: correct → score, wrong → Versuch, empty → ignored, another landmark's name → wrong
-- [ ] `guessById` in `find-landmark` counts a background id (absent from `items`) as wrong
-- [ ] The existing modes' behaviour and tests are unchanged
-- [ ] `nearestLandmark`: nearest of two rivers; beyond radius → `null`; inside a lake → lake even with a river through it; inside a lake's hole → not the lake unless within radius of an edge; on a dot that sits on a river → city; a three-way tie → city; a larger radius reaches a feature that a smaller one doesn't
-- [ ] `landmark-hit.mjs` imports nothing, touches no globals, and its record shapes are documented in the module
-- [ ] `make test` passes
+- [x] `matchLandmark` accepts the bare name, the right article and a wrong article; rejects the bare article alone and empty input; leaves names untouched where the article is merely a prefix of a word ("Dieburg" isn't stripped)
+- [x] `guessByText` in `name-landmark`: correct → score, wrong → Versuch, empty → ignored, another landmark's name → wrong
+- [x] `guessById` in `find-landmark` counts a background id (absent from `items`) as wrong
+- [x] The existing modes' behaviour and tests are unchanged
+- [x] `nearestLandmark`: nearest of two rivers; beyond radius → `null`; inside a lake → lake even with a river through it; inside a lake's hole → not the lake unless within radius of an edge; on a dot that sits on a river → city; a three-way tie → city; a larger radius reaches a feature that a smaller one doesn't
+- [x] `landmark-hit.mjs` imports nothing, touches no globals, and its record shapes are documented in the module
+- [x] `make test` passes
+
+## Comments
+
+- Implemented (uncommitted, for review) on branch `landmark-rules`. `matchLandmark` and
+  `matchBundesland` share a private `lookupAlias(wanted, aliases)`. The `name-landmark`
+  branch is in `guessByText`; `find-landmark` has no new code, only tests (including a
+  background id that is absent from `items`). `landmark-hit.mjs` documents the
+  river/lake/city record shapes in its header and avoids even `Math`. A purity test greps
+  its source for imports and globals. `test/landmark-aliases.test.mjs` now goes through
+  `matchLandmark` and adds the article cases. `make test`: 108 → 145, all passing. A
+  mutation check (flipping the tie order, ignoring holes) makes the hit tests fail.
+
+**Review (coordinating session, 2026-10-01).** The agent had banned `Math` from
+`landmark-hit.mjs` (hand-rolled `hypot` via `** 0.5`); reverted to `Math.hypot`, as
+`game-core.mjs` already uses `Math`, and the purity test now forbids
+`document|window|globalThis|d3|localStorage`. Added a one-point-polyline test (that
+branch was uncovered). Mutation check: reversing the tie order fails 4 hit tests.
+`make test` 146/146.

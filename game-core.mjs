@@ -1,17 +1,19 @@
 /**
  * game-core — the pure rules of the quiz.
  *
- * This module is the project's single testing seam. It imports nothing and
- * touches no DOM, no D3, no `localStorage` and no timers; the only global it
- * uses is `Math` (for the default shuffle). Everything environmental — map
+ * This module is one of the project's two testing seams (the other is
+ * `landmark-hit.mjs`, which resolves a map point to a landmark). It imports
+ * nothing and touches no DOM, no D3, no `localStorage` and no timers; the only
+ * global it uses is `Math` (for the default shuffle). Everything environmental — map
  * rendering, zoom, CSS classes, panel visibility, the wrong-guess flash and
  * auto-advance timers, score persistence — lives in `main.js` on the other
  * side of this boundary.
  *
  * `items` is deliberately generic: a plain object keyed by item id, each value
  * carrying at least a `name` and (for capital mode) a `capital`. It is not
- * named after Bundeslaender so that other item sets (e.g. rivers or cities for
- * a later mode) can go through the same rules.
+ * named after Bundeslaender so that other item sets go through the same rules:
+ * the landmark modes (`find-landmark`, `name-landmark`) play rivers, lakes and
+ * cities with it, keyed by feature id.
  */
 
 /* === Phases === */
@@ -62,7 +64,26 @@ export function normalize(text) {
  * and works for any alias table of the same shape.
  */
 export function matchBundesland(text, aliases) {
-  const wanted = normalize(text);
+  return lookupAlias(normalize(text), aliases);
+}
+
+/** One leading German article, as a whole word followed by whitespace. */
+const LEADING_ARTICLE = /^(der|die|das)\s+/i;
+
+/**
+ * Look a typed landmark name up in an alias table, the same canonical lookup
+ * as `matchBundesland`, after stripping **one** leading `der`/`die`/`das`.
+ * The article is not checked, so a wrong one ("die Rhein") is accepted; the
+ * bare article alone matches nothing, and an article that is only the start
+ * of a word ("Dieburg") is left alone. Returns the item id, or `null`.
+ */
+export function matchLandmark(text, aliases) {
+  if (typeof text !== 'string') return null;
+  return lookupAlias(normalize(text.trim().replace(LEADING_ARTICLE, '')), aliases);
+}
+
+/** The shared alias lookup: `wanted` is already in canonical form. */
+function lookupAlias(wanted, aliases) {
   if (!wanted || !aliases) return null;
   for (const key of Object.keys(aliases)) {
     if (normalize(key) === wanted) return aliases[key];
@@ -104,6 +125,7 @@ export function shuffleInPlace(arr) {
  * @param {object}   options.items        item id -> item record
  * @param {object}   [options.aliases]    alias string -> item id
  * @param {string}   options.mode         'find' | 'name-bundesland' | 'name-capital'
+ *                                        | 'find-landmark' | 'name-landmark'
  * @param {number}   [options.totalRounds] clamped to the number of items
  * @param {number}   [options.maxGuesses]
  * @param {function} [options.shuffle]    injected for deterministic tests
@@ -197,7 +219,11 @@ export function createGame({
       return snapshot();
     },
 
-    /** A map click. Any id other than the target costs a guess — no dedup. */
+    /**
+     * A map click. Any id other than the target costs a guess — no dedup —
+     * including an id that is not in `items` at all (a landmark background
+     * feature, or a deselected type).
+     */
     guessById(id) {
       if (s.phase !== PLAYING) return ignored();
       return resolve(id === s.targetId);
@@ -212,6 +238,9 @@ export function createGame({
       }
       if (s.mode === 'name-bundesland') {
         return resolve(matchBundesland(text, aliases) === s.targetId);
+      }
+      if (s.mode === 'name-landmark') {
+        return resolve(matchLandmark(text, aliases) === s.targetId);
       }
       return ignored();
     },

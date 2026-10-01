@@ -6,6 +6,7 @@ import {
   normalize,
   matchBundesland,
   matchCapital,
+  matchLandmark,
 } from '../game-core.mjs';
 
 /* === Fixtures ===
@@ -388,4 +389,154 @@ test('a typed name in capital mode is judged against the capital, not the name',
 
   assert.strictEqual(result.correct, false);
   assert.strictEqual(result.guessesLeft, 2);
+});
+
+/* === Landmarks ===
+ *
+ * A second synthetic item set for the two landmark modes: two rivers, a lake
+ * and a city, with an alias table of the same shape as the Bundesland one.
+ * `L9` is a background feature: drawn and clickable, but never an item.
+ */
+
+const landmarkItems = {
+  L1: { name: 'Main', article: 'der' },
+  L2: { name: 'Mainz', article: null },
+  L3: { name: 'Donau', article: 'die' },
+  L4: { name: 'Müritz', article: 'die' },
+};
+
+const landmarkAliases = {
+  'Main': 'L1',
+  'Mainz': 'L2',
+  'Donau': 'L3',
+  'Danube': 'L3',
+  'Müritz': 'L4',
+  'Dieburg': 'L5',
+};
+
+function newLandmarkGame(overrides = {}) {
+  return createGame({
+    items: landmarkItems,
+    aliases: landmarkAliases,
+    mode: 'name-landmark',
+    totalRounds: 3,
+    maxGuesses: 3,
+    shuffle: inOrder,
+    ...overrides,
+  });
+}
+
+test('a landmark matches by its bare name', () => {
+  assert.strictEqual(matchLandmark('Main', landmarkAliases), 'L1');
+  assert.strictEqual(matchLandmark('Danube', landmarkAliases), 'L3');
+});
+
+test('one leading article is stripped before the lookup', () => {
+  assert.strictEqual(matchLandmark('der Main', landmarkAliases), 'L1');
+  assert.strictEqual(matchLandmark('die Donau', landmarkAliases), 'L3');
+  assert.strictEqual(matchLandmark('das Mainz', landmarkAliases), 'L2');
+});
+
+test('a wrong article is accepted', () => {
+  assert.strictEqual(matchLandmark('die Main', landmarkAliases), 'L1');
+  assert.strictEqual(matchLandmark('der Donau', landmarkAliases), 'L3');
+});
+
+test('only one article is stripped', () => {
+  assert.strictEqual(matchLandmark('die der Main', landmarkAliases), null);
+});
+
+test('the article is stripped whatever its case and the whitespace around it', () => {
+  assert.strictEqual(matchLandmark('DER Main', landmarkAliases), 'L1');
+  assert.strictEqual(matchLandmark('Die donau', landmarkAliases), 'L3');
+  assert.strictEqual(matchLandmark('  der   Main  ', landmarkAliases), 'L1');
+  assert.strictEqual(matchLandmark('der\tMain', landmarkAliases), 'L1');
+});
+
+test('the normaliser variants still match after the article', () => {
+  assert.strictEqual(matchLandmark('die Mueritz', landmarkAliases), 'L4');
+  assert.strictEqual(matchLandmark('die muritz', landmarkAliases), 'L4');
+  assert.strictEqual(matchLandmark('Müritz', landmarkAliases), 'L4');
+});
+
+test('the bare article and empty input match nothing', () => {
+  assert.strictEqual(matchLandmark('der', landmarkAliases), null);
+  assert.strictEqual(matchLandmark('Die ', landmarkAliases), null);
+  assert.strictEqual(matchLandmark('', landmarkAliases), null);
+  assert.strictEqual(matchLandmark('   ', landmarkAliases), null);
+  assert.strictEqual(matchLandmark(undefined, landmarkAliases), null);
+  assert.strictEqual(matchLandmark('Main', undefined), null);
+});
+
+test('an article that is only the start of a word is not stripped', () => {
+  assert.strictEqual(matchLandmark('Dieburg', landmarkAliases), 'L5');
+  assert.strictEqual(matchLandmark('Dermain', landmarkAliases), null);
+});
+
+test('a landmark pair that differs by one letter stays distinct', () => {
+  assert.strictEqual(matchLandmark('der Main', landmarkAliases), 'L1');
+  assert.strictEqual(matchLandmark('Mainz', landmarkAliases), 'L2');
+});
+
+test('a correct typed landmark name scores a point in name-landmark mode', () => {
+  const game = newLandmarkGame();
+  const result = game.guessByText('der Main');
+
+  assert.strictEqual(result.correct, true);
+  assert.strictEqual(result.phase, 'feedback');
+  assert.strictEqual(game.state.score, 1);
+});
+
+test('a wrong typed landmark name costs one guess', () => {
+  const game = newLandmarkGame();
+  const result = game.guessByText('Atlantis');
+
+  assert.strictEqual(result.correct, false);
+  assert.strictEqual(result.guessesLeft, 2);
+  assert.strictEqual(result.phase, 'playing');
+});
+
+test('empty input in name-landmark mode consumes no guess', () => {
+  const game = newLandmarkGame();
+  const before = game.state;
+
+  assert.strictEqual(game.guessByText('').ignored, true);
+  assert.strictEqual(game.guessByText('   ').ignored, true);
+  assert.deepStrictEqual(game.state, before);
+});
+
+test('another landmark\'s name costs a guess in name-landmark mode', () => {
+  const game = newLandmarkGame();
+  const result = game.guessByText('Mainz');
+
+  assert.strictEqual(result.correct, false);
+  assert.strictEqual(result.guessesLeft, 2);
+  assert.strictEqual(game.state.score, 0);
+});
+
+test('a correct landmark click scores a point in find-landmark mode', () => {
+  const game = newLandmarkGame({ mode: 'find-landmark' });
+  const result = game.guessById('L1');
+
+  assert.strictEqual(result.correct, true);
+  assert.strictEqual(game.state.score, 1);
+});
+
+test('a click on another landmark costs a guess in find-landmark mode', () => {
+  const game = newLandmarkGame({ mode: 'find-landmark' });
+  const result = game.guessById('L2');
+
+  assert.strictEqual(result.correct, false);
+  assert.strictEqual(result.guessesLeft, 2);
+});
+
+test('a click on a background feature that is not an item costs a guess in find-landmark mode', () => {
+  const game = newLandmarkGame({ mode: 'find-landmark' });
+  assert.ok(!('L9' in landmarkItems));
+  const result = game.guessById('L9');
+
+  assert.strictEqual(result.correct, false);
+  assert.strictEqual(result.guessesLeft, 2);
+  assert.strictEqual(result.phase, 'playing');
+  assert.strictEqual(game.state.score, 0);
 });
