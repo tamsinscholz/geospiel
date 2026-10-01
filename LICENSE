@@ -34,6 +34,17 @@ documented in SOURCES.md:
   - wappen/ (the Landeswappen): Public Domain, subject to the insignia law
     (Wappengesetz) of each Bundesland, which restricts their use independently
     of copyright.
+  - data/gewaesser.topo.json, data/staedte.json (river, lake and city
+    geometry): derived from OpenStreetMap, (c) OpenStreetMap contributors,
+    available under the Open Database License (ODbL) 1.0 --
+    https://opendatacommons.org/licenses/odbl/1-0/ ; see also
+    https://www.openstreetmap.org/copyright . These two files are licensed
+    under the ODbL only, and anyone may use them under its terms.
+  - data/landmarks.json (the river, lake and city facts): lengths, areas and
+    depths from Wikidata (CC0), checked against de.wikipedia; population from
+    Statistisches Bundesamt (Destatis) -- reproduction and distribution
+    permitted with attribution. Names, articles and pool flags are the work of
+    Krautlabs Inc.
 
-data/bundesland-aliases.json is the work of Krautlabs Inc. and is covered by
-the CC BY-NC 4.0 licence above.
+data/bundesland-aliases.json and data/landmark-aliases.json are the work of
+Krautlabs Inc. and are covered by the CC BY-NC 4.0 licence above.

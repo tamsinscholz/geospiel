@@ -116,6 +116,7 @@ body[data-screen="stats"] #screen-stats { display: flex; }
 .settings-credits[aria-expanded="true"] .credits-short { display: none; }
 .settings-credits[aria-expanded="true"] .credits-full { display: inline; }
 .settings-credits:focus-visible { outline: 1px solid #ccc; outline-offset: 2px; }
+.settings-credits a { color: inherit; }
 .overlay-footer { margin-top: 20px; font-size: 0.75rem; color: #999; text-align: center; }
 .overlay-footer a { color: inherit; text-decoration: none; }
 .overlay-footer a:hover { text-decoration: underline; }

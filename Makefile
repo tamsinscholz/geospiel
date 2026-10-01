@@ -12,9 +12,10 @@ run:
 test:
 	node --test test/
 
-# The only cache is tools/vendor-germany-data.sh's download cache (GISCO
-# GeoJSON + raw Commons SVGs); it is re-downloaded on the next run. The vendored
-# data/ and wappen/ outputs are committed and never cleaned.
+# The only cache is the vendoring scripts' download cache (GISCO GeoJSON + raw
+# Commons SVGs from tools/vendor-germany-data.sh, Overpass responses from
+# tools/vendor-landmark-data.sh); it is re-downloaded on the next run. The
+# vendored data/ and wappen/ outputs are committed and never cleaned.
 clean:
 	rm -rf tools/.cache
 

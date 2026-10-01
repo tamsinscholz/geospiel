@@ -60,6 +60,36 @@
     th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
     td.mismatch { color: var(--bad); font-weight: 700; }
+
+    /* Gewässer & Städte: pool features in water blue, background in grey-violet */
+    #lm-wrap { position: relative; height: 78vh; background: var(--sea); border: 1px solid var(--line); }
+    #lm-map { width: 100%; height: 100%; display: block; }
+    #lm-map path, #lm-map circle { vector-effect: non-scaling-stroke; }
+    #lm-controls { position: absolute; top: 8px; left: 8px; display: flex; gap: 10px; align-items: center;
+                   background: rgba(255,255,255,.9); border: 1px solid var(--line); padding: 6px 8px; font-size: 12px; }
+    #lm-controls button { font: inherit; padding: 3px 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+    #lm-controls button[aria-pressed="true"] { background: var(--fg); color: #fff; border-color: var(--fg); }
+    .lm-key { display: inline-block; width: 14px; height: 4px; vertical-align: middle; margin-right: 3px; }
+    .lm-land { fill: #e9eee6; stroke: #b9c4b5; stroke-width: 0.8; }
+    .lm-river { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+    .lm-lake { stroke-width: 0.8; }
+    .lm-city { stroke: #fff; stroke-width: 1; }
+    .lm-river.pool { stroke: var(--lm-pool); }
+    .lm-lake.pool { fill: var(--lm-pool-fill); stroke: var(--lm-pool); }
+    .lm-city.pool { fill: #333; }
+    .lm-river.background { stroke: var(--lm-bg); }
+    .lm-lake.background { fill: var(--lm-bg-fill); stroke: var(--lm-bg); }
+    :root { --lm-pool: #3a78c2; --lm-pool-fill: #a9c8ea; --lm-bg: #9b6fb5; --lm-bg-fill: #dcc8e8; }
+    .lm-hit { pointer-events: none; fill: none; stroke: rgba(242, 140, 0, .28); stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; }
+    .lm-hit.lake { fill: rgba(242, 140, 0, .28); }
+    .lm-hit.city { fill: rgba(242, 140, 0, .28); stroke: none; }
+    #lm-hits[hidden] { display: none; }
+    .lm-label { font: 600 10px system-ui, sans-serif; fill: #1d2530; paint-order: stroke; stroke: #fff;
+                stroke-width: 3px; pointer-events: none; dominant-baseline: middle; }
+    .lm-label.river { font-style: italic; fill: #23518a; }
+    .lm-label.background { fill: #6b3f85; }
+    td.ok { color: var(--ok); font-weight: 700; text-align: center; }
+    td.missing { color: var(--bad); font-weight: 700; text-align: center; }
   </style>
 </head>
 <body>
@@ -94,6 +124,33 @@
     <table id="meta-table"></table>
   </section>
 
+  <section>
+    <h2>Gewässer &amp; Städte</h2>
+    <div class="muted">
+      <code>data/gewaesser.topo.json</code> (rivers clipped to Germany + 5 km, lakes whole), <code>data/staedte.json</code>
+      — both OSM, ODbL — and the curated <code>data/landmarks.json</code>. Labels are the curated names.
+      Scroll or pinch to zoom (1–6×); the hit-radius toggle draws the game's 12&nbsp;px radius (spec "Hit-testing")
+      around every feature at the current zoom.
+    </div>
+  </section>
+
+  <section>
+    <div id="lm-wrap">
+      <svg id="lm-map" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="lm-controls">
+        <span><span class="lm-key" style="background: var(--lm-pool)"></span>Pool</span>
+        <span><span class="lm-key" style="background: var(--lm-bg)"></span>Hintergrund</span>
+        <button id="lm-hit-toggle" aria-pressed="false">Trefferradius 12 px</button>
+        <button id="lm-label-toggle" aria-pressed="true">Beschriftung</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Landmark metadata</h2>
+    <table id="lm-table"></table>
+  </section>
+
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
   <script type="module">
@@ -103,10 +160,13 @@
     const fmt = new Intl.NumberFormat('de-DE');
     const fmtArea = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
 
-    const [topo, kulisseTopo, meta] = await Promise.all([
+    const [topo, kulisseTopo, meta, gewaesserTopo, staedte, landmarks] = await Promise.all([
       d3.json('../data/bundeslaender.topo.json'),
       d3.json('../data/kulisse.topo.json'),
       d3.json('../data/bundeslaender.json'),
+      d3.json('../data/gewaesser.topo.json'),
+      d3.json('../data/staedte.json'),
+      d3.json('../data/landmarks.json'),
     ]);
     const states = topojson.feature(topo, topo.objects.bundeslaender).features;
     const kulisse = topojson.feature(kulisseTopo, kulisseTopo.objects.kulisse).features;
@@ -265,6 +325,107 @@
           <td>${(computedNeighbours[key] || []).join(', ')}</td></tr>`;
       }).join('');
 
+    /* === Gewässer & Städte === */
+    const rivers = topojson.feature(gewaesserTopo, gewaesserTopo.objects.rivers).features;
+    const lakes = topojson.feature(gewaesserTopo, gewaesserTopo.objects.lakes).features;
+    const cities = staedte.features;
+    const poolClass = d => landmarks[d.id]?.pool ? 'pool' : 'background';
+    const lmName = d => landmarks[d.id]?.name ?? `${d.id} (no record)`;
+    const lmSvg = d3.select('#lm-map').attr('viewBox', vb.join(' '));
+    const lmLayer = lmSvg.append('g');
+    const lmHits = lmLayer.append('g').attr('id', 'lm-hits').attr('hidden', '');
+    lmLayer.insert('g', '#lm-hits').selectAll('path').data(states).join('path')
+      .attr('class', 'lm-land').attr('d', path);
+    // Lakes over rivers, cities on top, as the spec's layer order.
+    lmLayer.append('g').selectAll('path').data(rivers).join('path')
+      .attr('class', d => `lm-river ${poolClass(d)}`).attr('d', path)
+      .append('title').text(d => `${lmName(d)} · ${d.id}`);
+    lmLayer.append('g').selectAll('path').data(lakes).join('path')
+      .attr('class', d => `lm-lake ${poolClass(d)}`).attr('d', path)
+      .append('title').text(d => `${lmName(d)} · ${d.id}`);
+    const DOT_R = 3.5, HIT_PX = 12;
+    const cityAt = d => projection(d.geometry.coordinates);
+    const cityDots = lmLayer.append('g').selectAll('circle').data(cities).join('circle')
+      .attr('class', d => `lm-city ${poolClass(d)}`)
+      .attr('cx', d => cityAt(d)[0]).attr('cy', d => cityAt(d)[1]).attr('r', DOT_R);
+    cityDots.append('title').text(d => `${lmName(d)} · ${d.id}`);
+
+    // The hit radius: 12 screen px around the drawn shape. Strokes are
+    // non-scaling, so a 24 px stroke is ±12 px at every zoom. Radii are in
+    // viewBox units, so a screen-px radius is divided by the viewBox's px per
+    // unit and by k (spec: radius = 12 / pxPerUnit / k), see sizeDots().
+    lmHits.selectAll('path.river').data(rivers).join('path').attr('class', 'lm-hit river').attr('d', path);
+    lmHits.selectAll('path.lake').data(lakes).join('path').attr('class', 'lm-hit lake').attr('d', path);
+    const cityHits = lmHits.selectAll('circle').data(cities).join('circle').attr('class', 'lm-hit city')
+      .attr('cx', d => cityAt(d)[0]).attr('cy', d => cityAt(d)[1]).attr('r', DOT_R + HIT_PX);
+
+    // Labels: the curated name, at the city dot, a lake's centroid, or the
+    // middle vertex of a river's longest part.
+    const riverLabelAt = d => {
+      const lines = d.geometry.type === 'LineString' ? [d.geometry.coordinates] : d.geometry.coordinates;
+      const longest = lines.reduce((a, b) => (b.length > a.length ? b : a));
+      return projection(longest[Math.floor(longest.length / 2)]);
+    };
+    const lmLabelData = [
+      ...rivers.map(d => ({ d, kind: 'river', at: riverLabelAt(d) })),
+      ...lakes.map(d => ({ d, kind: 'lake', at: path.centroid(d) })),
+      ...cities.map(d => ({ d, kind: 'city', at: cityAt(d) })),
+    ];
+    const lmLabels = lmLayer.append('g').attr('id', 'lm-labels').selectAll('text').data(lmLabelData).join('text')
+      .attr('class', l => `lm-label ${l.kind} ${poolClass(l.d)}`)
+      .attr('transform', l => `translate(${l.at})`)
+      .attr('x', 6).text(l => lmName(l.d));
+
+    let lmK = 1;
+    function sizeDots() {
+      const pxPerUnit = lmSvg.node().getScreenCTM()?.a || 1;
+      cityDots.attr('r', DOT_R / pxPerUnit / lmK);
+      cityHits.attr('r', (DOT_R + HIT_PX) / pxPerUnit / lmK);
+    }
+    lmSvg.call(d3.zoom().scaleExtent([1, 6])
+      .translateExtent([[vb[0], vb[1]], [vb[0] + vb[2], vb[1] + vb[3]]])
+      .on('zoom', e => {
+        lmK = e.transform.k;
+        lmLayer.attr('transform', e.transform);
+        lmLabels.attr('transform', l => `translate(${l.at}) scale(${1 / lmK})`);
+        sizeDots();
+      }));
+    sizeDots();
+    window.addEventListener('resize', sizeDots);
+    const toggle = (id, apply) => {
+      const btn = document.getElementById(id);
+      btn.addEventListener('click', () => {
+        const on = btn.getAttribute('aria-pressed') !== 'true';
+        btn.setAttribute('aria-pressed', on);
+        apply(on);
+      });
+    };
+    toggle('lm-hit-toggle', on => lmHits.attr('hidden', on ? null : ''));
+    toggle('lm-label-toggle', on => d3.select('#lm-labels').attr('hidden', on ? null : ''));
+
+    /* === Landmark metadata table === */
+    const lmGeometryIds = {
+      river: new Set(rivers.map(d => d.id)), lake: new Set(lakes.map(d => d.id)), city: new Set(cities.map(d => d.id)),
+    };
+    const fmtDec = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const lmFacts = r => r.type === 'river' ? `Länge ${fmt.format(r.length_km)} km`
+      : r.type === 'lake' ? `Fläche ${fmtDec.format(r.area_km2)} km² · Tiefe ${fmt.format(r.max_depth_m)} m · ${r.bundeslaender.map(k => meta[k]?.name ?? k).join(', ')}`
+      : `Einwohner ${fmt.format(r.population)} · ${meta[r.bundesland]?.name ?? r.bundesland}` +
+        (r.capital_of ? ` · Landeshauptstadt von ${meta[r.capital_of]?.name ?? r.capital_of}` : '');
+    document.getElementById('lm-table').innerHTML = `
+      <tr><th>Id</th><th>Typ</th><th>Name</th><th>Artikel</th><th>Pool</th><th>Wikidata</th><th>OSM</th>
+          <th>Fakten</th><th>Geometrie</th></tr>` +
+      Object.entries(landmarks).map(([id, r]) => {
+        const has = lmGeometryIds[r.type]?.has(id);
+        return `<tr>
+          <td>${id}</td><td>${r.type}</td><td>${r.name}</td><td>${r.article ?? '—'}</td>
+          <td>${r.pool ? 'Pool' : 'Hintergrund'}</td>
+          <td><a href="https://www.wikidata.org/wiki/${r.wikidata}">${r.wikidata}</a></td>
+          <td>${r.osm.map(o => `<a href="https://www.openstreetmap.org/${o}">${o}</a>`).join('<br>')}</td>
+          <td>${lmFacts(r)}</td>
+          <td class="${has ? 'ok' : 'missing'}">${has ? '✓' : '✗'}</td></tr>`;
+      }).join('');
+
     /* === Structural checks (the same set agreement as test/data.test.mjs) === */
     const geoKeys = geoms.map(g => g.id);
     const metaKeys = Object.keys(meta);
@@ -298,6 +459,15 @@
       ['Curated Nachbarländer equal the shared-arc adjacency',
         metaKeys.every(k => computedNeighbours[k]?.length === meta[k].neighbour_count)],
       ['Kulisse contains no German territory', !kulisse.some(f => f.id === 'DE')],
+      ['Landmarks: 18 rivers, 11 lakes, 24 city points',
+        rivers.length === 18 && lakes.length === 11 && cities.length === 24],
+      ['Landmarks: every record has geometry of its type',
+        Object.entries(landmarks).every(([id, r]) => lmGeometryIds[r.type]?.has(id))],
+      ['Landmarks: every geometry has a record',
+        [...rivers, ...lakes, ...cities].every(d => d.id in landmarks)],
+      ['Landmarks: each Landeshauptstadt named as in bundeslaender.json',
+        Object.values(landmarks).filter(r => r.capital_of).length === 16 &&
+        Object.values(landmarks).every(r => !r.capital_of || meta[r.capital_of]?.capital === r.name)],
     ];
     document.getElementById('checks').innerHTML = checks.map(([label, ok]) =>
       `<li><span class="${ok === null ? 'muted' : ok ? 'pass' : 'fail'}">${ok === null ? 'n/a' : ok ? 'PASS' : 'FAIL'}</span> ${label}${ok === null ? ' (no directory listing from this server)' : ''}</li>`).join('');

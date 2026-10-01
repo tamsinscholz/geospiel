@@ -1,0 +1,145 @@
+{
+  "Rhein": "river-rhein",
+  "Rhine": "river-rhein",
+  "Rhien": "river-rhein",
+  "Rein": "river-rhein",
+
+  "Donau": "river-donau",
+  "Danube": "river-donau",
+  "Donnau": "river-donau",
+
+  "Elbe": "river-elbe",
+
+  "Main": "river-main",
+
+  "Weser": "river-weser",
+  "Wesser": "river-weser",
+
+  "Ems": "river-ems",
+
+  "Oder": "river-oder",
+
+  "Neckar": "river-neckar",
+  "Necker": "river-neckar",
+  "Nekar": "river-neckar",
+
+  "Mosel": "river-mosel",
+  "Moselle": "river-mosel",
+  "Mossel": "river-mosel",
+
+  "Spree": "river-spree",
+  "Spre": "river-spree",
+
+  "Bodensee": "lake-bodensee",
+  "Lake Constance": "lake-bodensee",
+  "Schwäbisches Meer": "lake-bodensee",
+
+  "Müritz": "lake-mueritz",
+  "Müritzsee": "lake-mueritz",
+  "Lake Müritz": "lake-mueritz",
+  "Mürritz": "lake-mueritz",
+
+  "Chiemsee": "lake-chiemsee",
+  "Bayerisches Meer": "lake-chiemsee",
+  "Lake Chiem": "lake-chiemsee",
+  "Chimsee": "lake-chiemsee",
+  "Kiemsee": "lake-chiemsee",
+
+  "Schweriner See": "lake-schweriner-see",
+  "Lake Schwerin": "lake-schweriner-see",
+  "Schweriner Seen": "lake-schweriner-see",
+
+  "Starnberger See": "lake-starnberger-see",
+  "Würmsee": "lake-starnberger-see",
+  "Lake Starnberg": "lake-starnberger-see",
+  "Starnberger": "lake-starnberger-see",
+  "Starnbergersee": "lake-starnberger-see",
+
+  "Ammersee": "lake-ammersee",
+  "Lake Ammer": "lake-ammersee",
+  "Amersee": "lake-ammersee",
+
+  "Steinhuder Meer": "lake-steinhuder-meer",
+  "Steinhuder": "lake-steinhuder-meer",
+  "Steinhuder Mer": "lake-steinhuder-meer",
+
+  "Köln": "city-koeln",
+  "Cologne": "city-koeln",
+  "Kölln": "city-koeln",
+  "Coeln": "city-koeln",
+
+  "Frankfurt am Main": "city-frankfurt",
+  "Frankfurt": "city-frankfurt",
+  "Frankfurt/Main": "city-frankfurt",
+  "Frankfurt a. M.": "city-frankfurt",
+  "Frankfurt on the Main": "city-frankfurt",
+  "Franfurt": "city-frankfurt",
+
+  "Dortmund": "city-dortmund",
+  "Dortmunt": "city-dortmund",
+
+  "Leipzig": "city-leipzig",
+  "Leibzig": "city-leipzig",
+
+  "Nürnberg": "city-nuernberg",
+  "Nuremberg": "city-nuernberg",
+  "Nürnburg": "city-nuernberg",
+
+  "Mannheim": "city-mannheim",
+  "Manheim": "city-mannheim",
+
+  "Rostock": "city-rostock",
+  "Hansestadt Rostock": "city-rostock",
+
+  "Freiburg im Breisgau": "city-freiburg",
+  "Freiburg": "city-freiburg",
+  "Freiburg i. Br.": "city-freiburg",
+  "Freiburg in Breisgau": "city-freiburg",
+
+  "Stuttgart": "city-stuttgart",
+  "Stuttgard": "city-stuttgart",
+
+  "München": "city-muenchen",
+  "Munich": "city-muenchen",
+  "Münschen": "city-muenchen",
+
+  "Berlin": "city-berlin",
+
+  "Potsdam": "city-potsdam",
+
+  "Bremen": "city-bremen",
+  "Hansestadt Bremen": "city-bremen",
+  "Bremmen": "city-bremen",
+
+  "Hamburg": "city-hamburg",
+  "Hansestadt Hamburg": "city-hamburg",
+  "Hamburgh": "city-hamburg",
+
+  "Wiesbaden": "city-wiesbaden",
+  "Wisbaden": "city-wiesbaden",
+
+  "Schwerin": "city-schwerin",
+
+  "Hannover": "city-hannover",
+  "Hanover": "city-hannover",
+  "Hanofer": "city-hannover",
+
+  "Düsseldorf": "city-duesseldorf",
+  "Dusseldorf": "city-duesseldorf",
+  "Düsseldorff": "city-duesseldorf",
+
+  "Mainz": "city-mainz",
+
+  "Saarbrücken": "city-saarbruecken",
+  "Sarbrücken": "city-saarbruecken",
+
+  "Dresden": "city-dresden",
+
+  "Magdeburg": "city-magdeburg",
+  "Magdeburgh": "city-magdeburg",
+
+  "Kiel": "city-kiel",
+
+  "Erfurt": "city-erfurt",
+  "Erfuhrt": "city-erfurt"
+}

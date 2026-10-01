@@ -9,7 +9,7 @@ No build process or npm required. The `make` targets are the preferred entry poi
 ```bash
 make run    # python3 -m http.server 8000, then open http://localhost:8000
 make test   # node --test test/ (Node's built-in runner, node:assert)
-make clean  # drops tools/.cache (the vendoring script's download cache)
+make clean  # drops tools/.cache (the vendoring scripts' download cache)
 ```
 
 `make install` is a no-op because there are no dependencies.
@@ -30,21 +30,27 @@ Single-page vanilla JS application — no bundler, no npm.
 | `test/game-core.test.mjs` | Tests for `game-core.mjs` — `node --test`, `node:assert`, synthetic fixtures |
 | `test/aliases.test.mjs` | The real alias table through `matchBundesland`/`guessByText`, plus a normalised-key collision check |
 | `test/capitals.test.mjs` | The real Landeshauptstädte (and `capital_variants`) through `matchCapital`/`guessByText`, including a 16×16 other-capital rejection check |
-| `test/data.test.mjs` | Structural checks over the vendored data: geometry, metadata and Landeswappen agree on the same 16 keys, the Kulisse holds no German territory, `neighbour_count` matches the topology's adjacency |
+| `test/data.test.mjs` | Structural checks over the vendored data: geometry, metadata and Landeswappen agree on the same 16 keys, the Kulisse holds no German territory, `neighbour_count` matches the topology's adjacency; for the landmarks, geometry and `landmarks.json` agree on the same 53 ids, counts/pool flags/articles, capitals named as in `bundeslaender.json`, cities inside and lake centroids in their Bundesland, rivers inside Germany + 5 km |
+| `test/landmark-aliases.test.mjs` | The real landmark alias table: every pool feature reachable by its name (through `matchBundesland` until `matchLandmark` exists), no alias for a background or missing id, the normalised-key collision check, no two of the 53 names canonicalising together, Main/Mainz and Elbe/Ems distinct, no name starting with an article |
 | `style.css` | Layout, overlays, panels, buttons, responsive breakpoints |
 | `data/bundeslaender.topo.json` | Bundesland geometry (TopoJSON object `bundeslaender`, `id` = ISO 3166-2 key such as `DE-BY`) |
 | `data/kulisse.topo.json` | Neighbouring countries' land (object `kulisse`), drawn as muted scenery beneath the Bundesländer |
 | `data/bundeslaender.json` | Bundesland metadata keyed by ISO 3166-2 key (name, capital, optional capital_variants, population, area_km2, highest_point, neighbour_count) |
 | `data/bundesland-aliases.json` | Hand-authored alias table: readable spelling → ISO 3166-2 key (plain names, official long forms, abbreviations, English names, misspellings). Keys are normalised at match time, so write them readably |
+| `data/gewaesser.topo.json` | Gewässer & Städte geometry from OpenStreetMap (**ODbL**): TopoJSON objects `rivers` (18, clipped to Germany + 5 km, main stream only) and `lakes` (11, whole), `id` = feature id such as `river-rhein`. Not drawn by any mode yet |
+| `data/staedte.json` | The 24 city points from OpenStreetMap (**ODbL**): GeoJSON FeatureCollection, `id` = feature id such as `city-koeln`, 4 decimals |
+| `data/landmarks.json` | Hand-curated landmark metadata keyed by feature id: type, curated name and article (never OSM tags), pool flag, Wikidata/OSM ids, `length_km` / `area_km2` + `max_depth_m` + `bundeslaender` / `population` + `bundesland` (+ `capital_of` on the 16 Landeshauptstädte) |
+| `data/landmark-aliases.json` | Hand-authored alias table for the 41 **pool** landmarks only: readable spelling → feature id (German names, short forms, common exonyms, misspellings) |
 | `wappen/de-xx.svg` | Landeswappen, named by the lowercased ISO 3166-2 key |
 | `tools/vendor-germany-data.sh` | One-off, by-hand regeneration of the geometry and the Landeswappen from GISCO and Wikimedia Commons (mapshaper/svgo via `npx`, downloads cached in `tools/.cache/`). Not a build step; `data/bundeslaender.json` and the alias table are hand-curated |
-| `tools/data-review.html` | Dev page for checking the vendored data in the browser (`/tools/data-review.html`) |
+| `tools/vendor-landmark-data.sh` | One-off, by-hand regeneration of `data/gewaesser.topo.json` and `data/staedte.json` from Overpass, by Wikidata id **pinned** to OSM ids (fails on any mismatch), mapshaper via `npx`, downloads cached in `tools/.cache/landmarks/`. `landmarks.json` and the landmark aliases are hand-curated |
+| `tools/data-review.html` | Dev page for checking the vendored data in the browser (`/tools/data-review.html`), including a labelled landmark map (pool vs background colours, 12 px hit-radius toggle) and the landmark metadata table |
 | `SOURCES.md` | Provenance, licence and required credits for every piece of data |
 | `Makefile` | `install` / `run` / `test` / `clean` / `clean-all` |
 
 Data sources and their required credits are documented in `SOURCES.md`; the credits
 are shown in small muted text below the Einstellungen buttons (`#settings-credits`),
-collapsed to the short note "Karten: © EuroGeographics, Einwohner und Fläche: Destatis …"; a click, tap or Enter shows the full wording (`aria-expanded`), and it collapses again each time the Einstellungen screen opens. `LICENSE` excludes the third-party files in `data/` and `wappen/`.
+collapsed to the short note "Karten: © EuroGeographics, © OpenStreetMap, Einwohner und Fläche: Destatis …"; a click, tap or Enter shows the full wording (`aria-expanded`, the OpenStreetMap line linking to its copyright page), and it collapses again each time the Einstellungen screen opens. `LICENSE` excludes the third-party files in `data/` and `wappen/`; the two OSM files are ODbL ([ADR 0002](docs/adr/0002-osm-data-odbl-separate-files.md)).
 
 **Dependencies (all via CDN):**
 - D3.js v7 — SVG rendering, projections, zoom behavior
