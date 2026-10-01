@@ -105,7 +105,7 @@ are German.
   - **Constant screen size:** strokes are non-scaling; the dot and marker radii are set
     in viewBox units by the zoom handler (`sizeLandmarks()`: screen px ÷ px per viewBox
     unit ÷ `k`). The handler runs on every frame of a zoom transition too, so the
-    ring stays 18 px while the gentle zoom moves the map
+    ring stays 18 px while the gentle zoom or the finden modes' feedback pan moves the map
 - **Bundesländer in the landmark modes** (playing or feedback): quieter fill `#e6e6e2`,
   stroke `#9a9a94`, `pointer-events: none`, no hover; the touch halos are inert.
 - **Touch interaction (Erkunden):** tapping a Bundesland highlights it and opens the info

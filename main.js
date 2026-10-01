@@ -1,6 +1,6 @@
 import { createGame, landmarkPool, landmarkType, followRounds } from './game-core.mjs';
 import { nearestLandmark } from './landmark-hit.mjs';
-import { screenToViewBox, intersectExtents, fitBounds } from './view-fit.mjs';
+import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './view-fit.mjs';
 
 (() => {
   /* === DOM References === */
@@ -96,6 +96,11 @@ import { screenToViewBox, intersectExtents, fitBounds } from './view-fit.mjs';
   const CITY_TARGET_PX = 6;
   const MARKER_PX = 18;
   const HIT_RADIUS_PX = 12;
+
+  /** The finden modes' feedback pan keeps the target this far inside the
+   *  visible area, in screen px: past the marker ring's 18 px radius, so a
+   *  city's or lake's ring clears the panels too. */
+  const FEEDBACK_PAN_MARGIN_PX = 24;
 
   /** How long a wrongly clicked Bundesland or landmark flashes red. */
   const WRONG_FLASH_MS = 600;
@@ -420,6 +425,28 @@ import { screenToViewBox, intersectExtents, fitBounds } from './view-fit.mjs';
     // target the same way a drag would be constrained.
     const target = zoom.constrain()(
       d3.zoomIdentity.translate(x, y).scale(k), viewBoxExtent(), zoom.translateExtent());
+    d3.select('#map').transition().duration(duration)
+      .call(zoom.transform, target);
+  }
+
+  /** The finden modes' feedback pan: only if `bounds` are covered, i.e. not
+   *  inside the visible area under the current transform, pan by the
+   *  smallest translation that brings them FEEDBACK_PAN_MARGIN_PX inside it,
+   *  keeping `k`, within the pan clamp. A target too big for the area is
+   *  panned to cover it (the edge that was in view meets the area's edge). A
+   *  target already clear, however close to a panel, starts no transition at
+   *  all. Call after setPhase('feedback'). */
+  function panToBounds(bounds, duration = 750) {
+    if (!bounds) return;
+    const current = d3.zoomTransform(svgNode);
+    const area = visibleArea();
+    if (panIntoView(bounds, area, current) === current) return;
+    const panned = panIntoView(bounds, area, current, FEEDBACK_PAN_MARGIN_PX / pxPerUnit());
+    if (panned === current) return;
+    const { k, x, y } = panned;
+    const target = zoom.constrain()(
+      d3.zoomIdentity.translate(x, y).scale(k), viewBoxExtent(), zoom.translateExtent());
+    if (target.x === current.x && target.y === current.y) return;
     d3.select('#map').transition().duration(duration)
       .call(zoom.transform, target);
   }
@@ -878,7 +905,8 @@ import { screenToViewBox, intersectExtents, fitBounds } from './view-fit.mjs';
     // the target, location to location. The other quiz modes stay on the
     // overview: zooming in for feedback and back out for the next round, every
     // round, is tiring. They return to the overview only if the user has
-    // zoomed in themselves (at k = 1 the reset changes nothing), which in
+    // zoomed in themselves or the finden modes' feedback pan moved the map
+    // (on the untouched overview the reset changes nothing), which in
     // Bundesland finden also keeps the start un-zoomed, so the map gives
     // nothing away. Gewässer & Städte finden is one of these. The travel
     // comes after setPhase, so it fits the target above the input panel.
@@ -927,7 +955,7 @@ import { screenToViewBox, intersectExtents, fitBounds } from './view-fit.mjs';
     }
 
     if (landmark) {
-      // Orange target and marker; Gewässer & Städte finden doesn't zoom.
+      // Orange target and marker; Gewässer & Städte finden only pans (below).
       // Gewässer & Städte benennen reveals the answer in the prompt
       if (gameState.mode === 'name-landmark') gamePrompt.textContent = answer;
       setHoveredLandmark(null);
@@ -944,9 +972,13 @@ import { screenToViewBox, intersectExtents, fitBounds } from './view-fit.mjs';
     setPhase('feedback');
 
     // Re-centre on the target only where the round is already zoomed to it,
-    // fitting it above the feedback bar and the info panel, now laid out
+    // fitting it above the feedback bar and the info panel, now laid out.
+    // The finden modes stay where they are, unless the target is covered by
+    // the panels: then a small pan, no zoom, brings it clear
     if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
     else if (gameState.mode === 'name-landmark') zoomToBounds(landmarkBounds(id));
+    else if (gameState.mode === 'find') panToBounds(bundeslandBounds(id));
+    else if (gameState.mode === 'find-landmark') panToBounds(landmarkBounds(id));
 
     if (gameState.autoAdvance) {
       gameState.advanceTimer = setTimeout(advanceRound, 1800);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 
-import { screenToViewBox, intersectExtents, fitBounds } from '../view-fit.mjs';
+import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from '../view-fit.mjs';
 
 /* === screenToViewBox === */
 
@@ -85,4 +85,62 @@ test('fitBounds: minScale and maxScale clamp the scale', () => {
   const area = [[0, 0], [100, 100]];
   assert.strictEqual(fitBounds([[0, 0], [400, 400]], area, { minScale: 1 }).k, 1);
   assert.strictEqual(fitBounds([[0, 0], [1, 1]], area, { maxScale: 1.8 }).k, 1.8);
+});
+
+/* === panIntoView === */
+
+const AREA = [[0, 0], [100, 100]];
+const ID = { k: 1, x: 0, y: 0 };
+
+test('panIntoView: bounds already inside return the same transform', () => {
+  const t = { k: 1, x: 0, y: 0 };
+  assert.strictEqual(panIntoView([[10, 10], [90, 90]], AREA, t), t);
+});
+
+test('panIntoView: bounds below the area move up just far enough', () => {
+  // 80–110 in a 0–100 area: up by 10, x untouched
+  assert.deepStrictEqual(panIntoView([[10, 80], [20, 110]], AREA, ID), { k: 1, x: 0, y: -10 });
+});
+
+test('panIntoView: bounds above and left move down and right', () => {
+  assert.deepStrictEqual(panIntoView([[-5, -20], [10, 10]], AREA, ID), { k: 1, x: 5, y: 20 });
+});
+
+test('panIntoView: the margin shrinks the area on every side', () => {
+  // 80–95 is inside 0–100 but not inside 10–90: up by 5
+  assert.deepStrictEqual(panIntoView([[40, 80], [50, 95]], AREA, ID, 10), { k: 1, x: 0, y: -5 });
+  // 15–85 is inside 10–90: no move
+  const t = { k: 1, x: 0, y: 0 };
+  assert.strictEqual(panIntoView([[15, 15], [85, 85]], AREA, t, 10), t);
+});
+
+test('panIntoView: keeps k and works in screen units under the transform', () => {
+  // At k = 2, x = -50, y = -50, map y 60–70 is drawn at 70–90; the area ends
+  // at 80, so the translation moves up by 10. k is never touched
+  assert.deepStrictEqual(
+    panIntoView([[40, 60], [50, 70]], [[0, 0], [100, 80]], { k: 2, x: -50, y: -50 }),
+    { k: 2, x: -50, y: -60 });
+});
+
+test('panIntoView: a point is brought in by the margin', () => {
+  assert.deepStrictEqual(panIntoView([[50, 100], [50, 100]], AREA, ID, 20), { k: 1, x: 0, y: -20 });
+});
+
+test('panIntoView: bounds larger than the area align the edge that was inside', () => {
+  // 40–200 is longer than the 100-tall area; its top is inside, so it moves
+  // up until the top meets the area's top, covering the whole area
+  assert.deepStrictEqual(panIntoView([[10, 40], [20, 200]], AREA, ID), { k: 1, x: 0, y: -40 });
+  // The mirror: -150–60, bottom inside, moves down to the area's bottom
+  assert.deepStrictEqual(panIntoView([[10, -150], [20, 60]], AREA, ID), { k: 1, x: 0, y: 40 });
+});
+
+test('panIntoView: bounds larger than the area that already cover it stay', () => {
+  const t = { k: 1, x: 0, y: 0 };
+  assert.strictEqual(panIntoView([[10, -50], [20, 150]], AREA, t), t);
+});
+
+test('panIntoView: a pan in an area that does not start at zero', () => {
+  // Area y 30–70 (the band between the panels): 60–80 moves up by 10
+  assert.deepStrictEqual(
+    panIntoView([[0, 60], [10, 80]], [[0, 30], [100, 70]], ID), { k: 1, x: 0, y: -10 });
 });

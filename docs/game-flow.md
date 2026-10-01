@@ -139,8 +139,9 @@ modes. The four toggles show only for a landmark mode (CSS off `data-settings-mo
 
 **Zoom at round start:**
 - **Bundesland finden, Bundesland benennen, Gewässer & Städte finden:** the map stays on
-  the full-Germany overview. If the user has zoomed in, it returns to the overview (300 ms); at 1× nothing
-  moves.
+  the full-Germany overview. If the map has moved (the user zoomed in or panned, or
+  the finden modes' feedback pan, section 10, moved it), it returns to the overview (300 ms);
+  on the untouched overview nothing moves.
 - **Landeshauptstadt benennen, Gewässer & Städte benennen:** gentle zoom to the target
   (750 ms), into the **visible area**: the part of the map between the game panel and the
   input panel, so the target never ends up under either. The scale fits the Bundesland,
@@ -293,8 +294,19 @@ it sits on a river (Köln, Mainz, Dresden). Ties go city, then lake, then river.
 - **Zoom:** only Landeshauptstadt benennen and Gewässer & Städte benennen re-centre on
   the target (750 ms, capped at 1.8×), bringing it back if the user zoomed or panned away.
   They fit it into the visible area above the feedback bar and the info panel, which
-  are taller than the input panel, so the map usually moves up a little. Bundesland finden, Bundesland benennen and Gewässer & Städte finden stay where
-  they are, which is the overview unless the user has zoomed in.
+  are taller than the input panel, so the map usually moves up a little. Bundesland benennen stays where
+  it is, which is the overview unless the user has zoomed in.
+- **Bundesland finden and Gewässer & Städte finden** don't zoom either, but if the target
+  is covered by the panels (the game panel, or the feedback bar and the info panel), the
+  map pans, by the smallest translation that brings the target's bounds, plus 24 screen
+  px, into the visible area (750 ms). The scale stays exactly as it is: 1×, or whatever
+  the user zoomed to. A target already clear doesn't move the map at all (Mainz, the
+  Elbe, Hessen on a desktop). A target bigger than the visible area (Bayern when zoomed
+  in) is panned just far enough to cover the whole area, so as much of it as possible
+  shows: the edge that was in view meets the area's edge. On the overview at 1440×900
+  the Bodensee moves up about 140 viewBox units, Bayern about 185. The pan clamp,
+  which leaves room the height of the panels past Germany's edges, limits how far it
+  can go.
 
 **Automatisch weiter off:** a "Weiter →" button in the feedback bar, focused after
 100 ms (Enter or Space advances).
