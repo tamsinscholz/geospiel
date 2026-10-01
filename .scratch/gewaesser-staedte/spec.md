@@ -1,6 +1,6 @@
 # Spec: Gewässer & Städte — finding and naming rivers, lakes and cities
 
-Status: ready-for-agent
+Status: done
 
 Decided in a `/grilling` session with the maintainer on 2026-09-30. The research behind the
 pool and the pipeline (Wikidata/Overpass lookups, a rendering spike) was done the same

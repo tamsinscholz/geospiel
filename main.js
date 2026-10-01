@@ -60,6 +60,15 @@ import { nearestLandmark } from './landmark-hit.mjs';
     capital: 'Landeshauptstadt',
   };
 
+  /** Gewässer & Städte benennen's question, by `type` in landmarks.json.
+   *  Landeshauptstädte are asked as cities, so the prompt doesn't narrow the
+   *  answer to sixteen. */
+  const NAME_LANDMARK_PROMPTS = {
+    river: 'Welcher Fluss ist markiert?',
+    lake: 'Welcher See ist markiert?',
+    city: 'Welche Stadt ist markiert?',
+  };
+
   /** Zoom range; `k = 1` is the full-Germany view. */
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 6;
@@ -147,6 +156,9 @@ import { nearestLandmark } from './landmark-hit.mjs';
   /* === Data === */
   let bundeslaenderData = {};
   let aliasesData = {};
+  /** The landmark modes' own alias table (pool features only); the Bundesland
+   *  table is not consulted there, so the two can't conflict. */
+  let landmarkAliasesData = {};
   let geoFeatures = [];
   let kulisseFeatures = [];
   let landmarksData = {};
@@ -352,6 +364,19 @@ import { nearestLandmark } from './landmark-hit.mjs';
     return feature ? pathGenerator.bounds(feature) : null;
   }
 
+  /** A landmark's projected bounds: a river's or lake's extent, or a city's
+   *  point as zero-size bounds (which zoomToBounds caps at TARGET_ZOOM_MAX). */
+  function landmarkBounds(id) {
+    const kind = landmarksData[id] && landmarksData[id].type;
+    if (kind === 'city') {
+      const p = landmarkRecords.find(r => r.id === id).point;
+      return [p, p];
+    }
+    const features = kind === 'river' ? riverFeatures : lakeFeatures;
+    const feature = features.find(f => featureId(f) === id);
+    return feature ? pathGenerator.bounds(feature) : null;
+  }
+
   /** The gentle zoom: fit projected `bounds` (`[[x0, y0], [x1, y1]]`, viewBox
    *  units) at 0.9 of the viewBox, capped at TARGET_ZOOM_MAX. A point's zero
    *  bounds simply hit the cap. */
@@ -381,7 +406,7 @@ import { nearestLandmark } from './landmark-hit.mjs';
 
   /* === Data Loading === */
   async function loadData() {
-    const [topology, kulisseTopology, bundeslaender, aliases, gewaesserTopology, staedte, landmarks] = await Promise.all([
+    const [topology, kulisseTopology, bundeslaender, aliases, gewaesserTopology, staedte, landmarks, landmarkAliases] = await Promise.all([
       d3.json('data/bundeslaender.topo.json'),
       d3.json('data/kulisse.topo.json'),
       d3.json('data/bundeslaender.json'),
@@ -389,6 +414,7 @@ import { nearestLandmark } from './landmark-hit.mjs';
       d3.json('data/gewaesser.topo.json'),
       d3.json('data/staedte.json'),
       d3.json('data/landmarks.json'),
+      d3.json('data/landmark-aliases.json'),
     ]);
 
     bundeslaenderData = bundeslaender;
@@ -397,6 +423,7 @@ import { nearestLandmark } from './landmark-hit.mjs';
     kulisseFeatures = topojson.feature(kulisseTopology, kulisseTopology.objects.kulisse).features;
     const germany = topojson.merge(topology, topology.objects.bundeslaender.geometries);
     landmarksData = landmarks;
+    landmarkAliasesData = landmarkAliases;
     riverFeatures = topojson.feature(gewaesserTopology, gewaesserTopology.objects.rivers).features;
     lakeFeatures = topojson.feature(gewaesserTopology, gewaesserTopology.objects.lakes).features;
     cityFeatures = staedte.features;
@@ -765,7 +792,7 @@ import { nearestLandmark } from './landmark-hit.mjs';
 
     game = createGame({
       items,
-      aliases: aliasesData,
+      aliases: isLandmarkMode(gameState.mode) ? landmarkAliasesData : aliasesData,
       mode: gameState.mode,
       totalRounds: rounds,
       maxGuesses: gameState.maxGuesses,
@@ -784,7 +811,11 @@ import { nearestLandmark } from './landmark-hit.mjs';
     const state = game.state;
     const id = state.targetId;
 
-    if (isLandmarkMode(gameState.mode)) {
+    if (gameState.mode === 'name-landmark') {
+      // The question by type; the name is the answer. CSS hides the Wappen
+      gamePrompt.textContent = NAME_LANDMARK_PROMPTS[landmarksData[id].type];
+      gamePromptType.textContent = '';
+    } else if (isLandmarkMode(gameState.mode)) {
       // The name and its type ("Main" / "Fluss"); CSS hides the Wappen
       const r = landmarksData[id];
       gamePrompt.textContent = r.name;
@@ -808,17 +839,24 @@ import { nearestLandmark } from './landmark-hit.mjs';
 
     setPhase('playing');
 
-    // Only Landeshauptstadt benennen travels to the target, location to
-    // location. The other quiz modes stay on the overview: zooming in for
-    // feedback and back out for the next round, every round, is tiring. They
-    // return to the overview only if the user has zoomed in themselves (at
-    // k = 1 the reset changes nothing), which in Bundesland finden also keeps
-    // the start un-zoomed, so the map gives nothing away. Gewässer & Städte
-    // finden is one of these.
+    // Only Landeshauptstadt benennen and Gewässer & Städte benennen travel to
+    // the target, location to location. The other quiz modes stay on the
+    // overview: zooming in for feedback and back out for the next round, every
+    // round, is tiring. They return to the overview only if the user has
+    // zoomed in themselves (at k = 1 the reset changes nothing), which in
+    // Bundesland finden also keeps the start un-zoomed, so the map gives
+    // nothing away. Gewässer & Städte finden is one of these.
     if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
+    else if (gameState.mode === 'name-landmark') zoomToBounds(landmarkBounds(id));
     else resetZoom();
 
-    if (gameState.mode === 'name-bundesland' || gameState.mode === 'name-capital') {
+    if (gameState.mode === 'name-landmark') {
+      // The target shows while playing here (orange, marker for lakes and
+      // cities); in Gewässer & Städte finden only in feedback
+      highlightLandmark(id);
+      guessInput.placeholder = 'Name eingeben \u2026';
+      setTimeout(() => guessInput.focus(), 800);
+    } else if (gameState.mode === 'name-bundesland' || gameState.mode === 'name-capital') {
       highlightTarget(id);
       guessInput.placeholder = gameState.mode === 'name-bundesland'
         ? 'Bundesland eingeben \u2026'
@@ -853,7 +891,9 @@ import { nearestLandmark } from './landmark-hit.mjs';
     }
 
     if (landmark) {
-      // Orange target and marker; Gewässer & Städte finden doesn't zoom
+      // Orange target and marker; Gewässer & Städte finden doesn't zoom.
+      // Gewässer & Städte benennen reveals the answer in the prompt
+      if (gameState.mode === 'name-landmark') gamePrompt.textContent = answer;
       setHoveredLandmark(null);
       fillLandmarkInfo(id);
       highlightLandmark(id);
@@ -863,6 +903,7 @@ import { nearestLandmark } from './landmark-hit.mjs';
     }
     // Re-centre on the target only where the round is already zoomed to it
     if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
+    else if (gameState.mode === 'name-landmark') zoomToBounds(landmarkBounds(id));
     hudScore.textContent = state.score;
     // The round is complete once it reaches feedback
     renderProgress(state.currentRound + 1, state.totalRounds);

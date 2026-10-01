@@ -35,7 +35,7 @@ mode, in their existing style.
 
 ### Acceptance criteria
 
-- [ ] The menu shows six cards in the spec's order, with labels, icons and descriptions per the spec; one column at ≤600px
+- [x] The menu shows six cards in the spec's order, with labels, icons and descriptions per the spec; one column at ≤600px
 - [x] The Einstellungen screen for a landmark mode shows the four toggles (Landeshauptstädte off by default); they are absent for the Bundesland modes; the last toggle that is on can't be switched off
 - [x] Runden defaults to the selected pool size (25 by default), follows the maximum when the toggles change, and is remembered separately from the Bundesland modes' Runden
 - [x] Landmark layers are visible only in the landmark modes while playing or in feedback; never in Erkunden, the Bundesland modes or behind the menu

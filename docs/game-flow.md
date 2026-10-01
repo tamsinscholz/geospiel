@@ -42,8 +42,7 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
 | Find landmark | 🌊 | Gewässer & Städte finden | "Flüsse, Seen und Städte auf der Karte anklicken" | `find-landmark` |
 | Name landmark | 🏞️ | Gewässer & Städte benennen | "Den markierten Fluss, See oder die markierte Stadt benennen" | `name-landmark` |
 
-  The last card is in the markup but `hidden` until its mode's gameplay lands, so five
-  cards show (three rows, the last one half full).
+  Six cards in three rows.
 
 - Footer: "Quellcode auf GitHub" (links to `https://github.com/jan-scholz/geospiel`) ·
   "© 2026 Krautlabs Inc."
@@ -80,7 +79,8 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
 
 **What the user sees:**
 - An overlay card titled with the mode's name ("Bundesland finden",
-  "Bundesland benennen", "Landeshauptstadt benennen" or "Gewässer & Städte finden").
+  "Bundesland benennen", "Landeshauptstadt benennen", "Gewässer & Städte finden" or
+  "Gewässer & Städte benennen").
 
 | Setting | Control | Range | Default |
 |---|---|---|---|
@@ -126,7 +126,9 @@ modes. The four toggles show only for a landmark mode (CSS off `data-settings-mo
   ≤600px)
 - The prompt: the Bundesland's name (hidden in Bundesland benennen); in Gewässer &
   Städte finden the feature's name with its type in small grey text under it ("Fluss",
-  "See", "Stadt" or "Landeshauptstadt")
+  "See", "Stadt" or "Landeshauptstadt"); in Gewässer & Städte benennen the question by
+  type: "Welcher Fluss ist markiert?", "Welcher See ist markiert?" or "Welche Stadt ist
+  markiert?" (Landeshauptstädte too, so the prompt doesn't narrow the answer)
 - "Punkte: n" and "Versuche: n" (the Versuche left in this round)
 - Buttons "Überspringen" (only while the round is being played) and "Beenden"
 - A thin progress bar along the bottom edge. At the start of a round it stands at
@@ -136,9 +138,12 @@ modes. The four toggles show only for a landmark mode (CSS off `data-settings-mo
 - **Bundesland finden, Bundesland benennen, Gewässer & Städte finden:** the map stays on
   the full-Germany overview. If the user has zoomed in, it returns to the overview (300 ms); at 1× nothing
   moves.
-- **Landeshauptstadt benennen:** gentle zoom to the target (750 ms). The scale fits the
-  Bundesland but is capped at 1.8×, so a small Bundesland still shows most of Germany
-  around it. The pan clamp applies to this too.
+- **Landeshauptstadt benennen, Gewässer & Städte benennen:** gentle zoom to the target
+  (750 ms). The scale fits the Bundesland, or the feature's projected bounds, at 0.9 of
+  the view but is capped at 1.8×, so a small target still shows most of Germany around
+  it. Lakes and cities (a point has no extent) always hit the cap; the longest rivers
+  stop just short of it (Elbe 1.51×, Donau 1.56×, Rhein 1.63×). The pan clamp applies to
+  this too.
 
 **User actions available in every quiz mode:**
 - **Überspringen** (playing only): counts the round as skipped and goes straight to the
@@ -228,17 +233,47 @@ it sits on a river (Köln, Mainz, Dresden). Ties go city, then lake, then river.
 
 ---
 
-## 9. Feedback (`data-phase="feedback"`, all quiz modes)
+## 9. Gewässer & Städte benennen (`data-mode="name-landmark"`)
+
+**Round start:**
+- The game panel asks by type: "Welcher Fluss ist markiert?", "Welcher See ist
+  markiert?" or "Welche Stadt ist markiert?". No Landeswappen, no type line.
+- The target is marked in orange on the map from the start: a river 4 px over a white
+  casing, a lake filled, a city dot 6 px; a lake or city also gets the orange ring of 18
+  screen px, which keeps its size while the map moves. The map travels gently to it
+  (section 4).
+- The input panel appears with the placeholder "Name eingeben …" and "Antworten". The
+  field gets focus after 800 ms, once the zoom has finished.
+- Map clicks and hover do nothing in this mode.
+
+**User actions (Enter or "Antworten"):**
+- The typed name is looked up (`matchLandmark`) in `data/landmark-aliases.json`, after
+  one leading "der", "die" or "das" is dropped: "Rhein", "der Rhein" and even "die Rhein"
+  are right. The table has the German names, short forms ("Frankfurt", "Freiburg"),
+  exonyms ("Rhine", "Lake Constance", "Cologne", "Munich") and "Schwäbisches Meer"; Berlin,
+  Hamburg and Bremen are the cities here. The Bundesland table is not consulted. The bare
+  article ("der") matches nothing and costs a Versuch.
+- **Correct:** +1 Punkt, then feedback.
+- **Wrong, Versuche left:** "Falsch – noch 2 Versuche" (singular "noch 1 Versuch"); the
+  field is cleared and focused again.
+- **Wrong, none left:** feedback ("Keine Versuche mehr – es war das Steinhuder Meer").
+- **Empty or whitespace-only input:** ignored, no Versuch used.
+
+---
+
+## 10. Feedback (`data-phase="feedback"`, all quiz modes)
 
 **What the user sees:**
-- The input panel is gone. In Bundesland benennen the name appears in the game panel.
+- The input panel is gone. In Bundesland benennen the name appears in the game panel; in
+  Gewässer & Städte benennen the prompt becomes the feature with its article ("der
+  Main", "Köln").
 - **Feedback bar** above the info panel:
   - correct: green "Richtig!"
   - out of Versuche: red "Keine Versuche mehr – es war {Antwort}". The answer is the
-    Landeshauptstadt in Landeshauptstadt benennen, the feature with its article in
-    Gewässer & Städte finden ("der Main", "Köln"), and the Bundesland's name otherwise.
-- **Info panel** with the full facts (as in Erkunden). In Gewässer & Städte finden it
-  shows the feature instead, by type:
+    Landeshauptstadt in Landeshauptstadt benennen, the feature with its article in the
+    landmark modes ("der Main", "Köln"), and the Bundesland's name otherwise.
+- **Info panel** with the full facts (as in Erkunden). In the landmark modes it shows
+  the feature instead, by type:
 
 | Type | Name line | Under the name | Facts | Landeswappen |
 |---|---|---|---|---|
@@ -247,10 +282,10 @@ it sits on a river (Köln, Mainz, Dresden). Ties go city, then lake, then river.
 | Stadt | "Mainz" | "Landeshauptstadt von Rheinland-Pfalz" (Landeshauptstädte only) | "Einwohner" ("1.024.621"), "Bundesland" | its Bundesland's |
 
 - The target is highlighted (`.target`) in every mode, including Bundesland finden. In
-  Gewässer & Städte finden it turns orange (a river 4 px over a white casing, a lake
+  the landmark modes it is orange (in Gewässer & Städte finden it turns orange only now) (a river 4 px over a white casing, a lake
   filled, a city dot 6 px), and a lake or city gets an orange ring of 18 screen px.
-- **Zoom:** only Landeshauptstadt benennen re-centres on the target (750 ms, capped at
-  1.8×). Bundesland finden, Bundesland benennen and Gewässer & Städte finden stay where
+- **Zoom:** only Landeshauptstadt benennen and Gewässer & Städte benennen re-centre on
+  the target (750 ms, capped at 1.8×), bringing it back if the user zoomed or panned away. Bundesland finden, Bundesland benennen and Gewässer & Städte finden stay where
   they are, which is the overview unless the user has zoomed in.
 
 **Automatisch weiter off:** a "Weiter →" button in the feedback bar, focused after
@@ -263,7 +298,7 @@ After the last round, the next step is Spiel beendet instead of a new round.
 
 ---
 
-## 10. Spiel beendet (`data-screen="stats"`)
+## 11. Spiel beendet (`data-screen="stats"`)
 
 **What the user sees:**
 - Overlay titled "Spiel beendet":
@@ -282,7 +317,7 @@ After the last round, the next step is Spiel beendet instead of a new round.
 **Score history:** after the screen is filled, the game just finished is saved to
 `localStorage` under `geospiel-stats-<mode>` (`geospiel-stats-find`,
 `geospiel-stats-name-bundesland`, `geospiel-stats-name-capital`,
-`geospiel-stats-find-landmark`; the type toggles are not part of the key) as
+`geospiel-stats-find-landmark`, `geospiel-stats-name-landmark`; the type toggles are not part of the key) as
 `{ rounds, correct, skipped }`, keeping the last 10 games. The average therefore covers
 the earlier games, not the one just played. The `geospiel-` prefix keeps the world quiz's
 old `stats-<mode>` keys, which could exist on the same development origin, out of the
@@ -323,7 +358,7 @@ from Playing. Überspringen is hidden in feedback and only exists in Playing.
 | Attribute | Values | Set by |
 |---|---|---|
 | `data-phase` | `idle` (menu, Einstellungen, Erkunden, Spiel beendet) · `playing` · `feedback` | `setPhase()` |
-| `data-mode` | `explore` · `find` · `name-bundesland` · `name-capital` · `find-landmark` | `setMode()`, when Erkunden or a game starts. Opening Einstellungen does not change it, and it keeps its last value on the menu. CSS matches the landmark modes as `[data-mode$="-landmark"]` |
+| `data-mode` | `explore` · `find` · `name-bundesland` · `name-capital` · `find-landmark` · `name-landmark` | `setMode()`, when Erkunden or a game starts. Opening Einstellungen does not change it, and it keeps its last value on the menu. CSS matches the landmark modes as `[data-mode$="-landmark"]` |
 | `data-settings-mode` | the mode whose Einstellungen were last opened | `openSettings()`; shows the type toggles for a landmark mode |
 | `data-screen` | `select` · `settings` · `stats` · absent (no overlay: Erkunden and a game in progress) | `setScreen()` |
 | `data-auto-advance` | `on` · `off` | `startGame()`, for the whole game |

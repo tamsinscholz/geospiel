@@ -55,7 +55,9 @@ are German.
   margin. Programmatic zooms go through `zoom.constrain()` with the same extent.
 - **Gentle zoom (`zoomToBounds(bounds)`):** 750 ms transition to fit projected bounds at
   0.9 of the viewBox, capped at `TARGET_ZOOM_MAX = 1.8` (a point's zero bounds hit the
-  cap). Used only in Landeshauptstadt benennen, with the Bundesland's bounds.
+  cap). Used in Landeshauptstadt benennen, with the Bundesland's bounds, and in Gewässer
+  & Städte benennen, with the feature's (`landmarkBounds(id)`: a river's or lake's
+  `pathGenerator.bounds`, a city's point as zero bounds), at round start and in feedback.
   `resetZoom` animates back to `k = 1` in 300 ms.
 - **Touch halo (`.hit-target`):** for each Bundesland with `area_km2` below
   `SMALL_TARGET_MAX_AREA_KM2 = 1000` (Berlin, Bremen, Hamburg), a duplicate path of its
@@ -79,13 +81,16 @@ are German.
   - **Wrong click (`.wrong-guess`):** the Bundesland flash colours, `#e05555` (river line
     3px; lake and dot edged `#a02020`), removed after 600 ms
   - **Target (`.target`, orange `#f28c00`):** river line 4px over its white casing,
-    raised above the other rivers; lake filled (edge `#b86a00`); city dot 6 screen px
+    raised above the other rivers; lake filled (edge `#b86a00`); city dot 6 screen px.
+    Shown in feedback in Gewässer & Städte finden, and from round start in Gewässer &
+    Städte benennen
   - **Marker (`circle.marker`, `#marker-group`):** around a lake (its `d3.geoPath`
     centroid) or city target only: an orange ring, 2px stroke, no fill, 18 screen px
     radius
   - **Constant screen size:** strokes are non-scaling; the dot and marker radii are set
     in viewBox units by the zoom handler (`sizeLandmarks()`: screen px ÷ px per viewBox
-    unit ÷ `k`)
+    unit ÷ `k`). The handler runs on every frame of a zoom transition too, so the
+    ring stays 18 px while the gentle zoom moves the map
 - **Bundesländer in the landmark modes** (playing or feedback): quieter fill `#e6e6e2`,
   stroke `#9a9a94`, `pointer-events: none`, no hover; the touch halos are inert.
 - **Touch interaction (Erkunden):** tapping a Bundesland highlights it and opens the info
@@ -107,8 +112,7 @@ and `stats`).
 - **Card (`.overlay-card`):** white (`rgba(255,255,255,0.97)`), 20px radius, 36px/40px
   padding, max-width 760px, heavy drop shadow
 - **Title:** "Deutschland-Quiz", 1.6rem, bold 700, centred, 24px bottom margin
-- **Mode cards grid (`.mode-cards`):** 2-column grid, 16px gap; five cards in three
-  rows (the sixth, `name-landmark`, is `hidden`: `.mode-card[hidden] { display: none }`)
+- **Mode cards grid (`.mode-cards`):** 2-column grid, 16px gap; six cards in three rows
 - **Each mode card (`.mode-card`, `data-mode-choice`):** column flex, left-aligned,
   background `#f4f8fc`, 2px border `#dde6f0`, 12px radius, 20px padding. Hover: `#e6f0fa`
   background, `#4a90d9` border
@@ -180,7 +184,9 @@ and `stats`).
 - **Prompt (`#game-prompt`):** the Bundesland's name, 1.1rem, bold 700. In Bundesland
   benennen it is `visibility: hidden` while `data-phase="playing"` and shown in feedback.
   It keeps its space, so the layout does not jump. In Gewässer & Städte finden it is the
-  feature's name.
+  feature's name. In Gewässer & Städte benennen it is the question by type while playing
+  ("Welcher Fluss ist markiert?", "Welcher See ist markiert?", "Welche Stadt ist
+  markiert?") and the feature with its article in feedback ("der Rhein", "Mainz").
 - **Type label (`#game-prompt-type`):** under the prompt, 0.8rem, `#888`: "Fluss", "See",
   "Stadt" or "Landeshauptstadt". Shown only in `find-landmark`.
 - **HUD (`.game-hud`):** flex, 12px gap, nowrap. "Punkte: n", "Versuche: n" (`.hud-item`,
@@ -242,7 +248,7 @@ right-aligned.
     and the value (`.fact-value`) is bold, right-aligned and nowrap. Fields:
     "Fläche" (`{n} km²`), "Einwohner", "Höchster Punkt" (`{Name} ({n} m)`),
     "Nachbarländer" (count of adjacent Bundesländer)
-- **Per kind (`data-kind`):** `bundesland` (above), or in Gewässer & Städte finden
+- **Per kind (`data-kind`):** `bundesland` (above), or in the landmark modes
   `river`, `lake`, `city`. Each `.fact` lists the kinds it belongs to in `data-kinds`,
   and CSS hides the rest: river "Länge"; lake "Fläche" (one decimal), "Größte Tiefe",
   "Bundesland"; city "Einwohner", "Bundesland". The name line carries the article ("der
@@ -259,7 +265,7 @@ one column), with radius `16px 16px 0 0`.
 
 - **Layout:** flex column, 8px gap
 - **Visibility:** `display: flex` only when `data-phase="playing"` and `data-mode` is
-  `name-bundesland` or `name-capital`
+  `name-bundesland`, `name-capital` or `name-landmark`
 - **Contents:**
   - **Inline feedback (`#input-feedback`):** 0.88rem, min-height 1.2em, red `#c03030`,
     bold 600: "Falsch – noch {n} Versuche" / "Falsch – noch 1 Versuch"
@@ -270,7 +276,7 @@ one column), with radius `16px 16px 0 0`.
     off the placeholder or pushing the row out of the panel.
     - **Field:** 10px/14px padding, 8px radius, 1.5px `#ccc` border, white, 1rem. Focus
       border `#4a90d9`. Autocomplete, autocorrect and spellcheck off. Placeholder
-      "Bundesland eingeben …" or "Landeshauptstadt eingeben …"
+      "Bundesland eingeben …", "Landeshauptstadt eingeben …" or "Name eingeben …"
     - **"Antworten" (`#btn-submit`):** primary. Enter in the field also submits
 
 **Mobile (≤600px):** radius `16px 16px 0 0`, flush with the bottom edge.
