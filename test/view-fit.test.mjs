@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 
-import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from '../view-fit.mjs';
+import { screenToViewBox, intersectExtents, visibleBand, fitBounds, panIntoView } from '../view-fit.mjs';
 
 /* === screenToViewBox === */
 
@@ -126,6 +126,21 @@ test('panIntoView: a point is brought in by the margin', () => {
   assert.deepStrictEqual(panIntoView([[50, 100], [50, 100]], AREA, ID, 20), { k: 1, x: 0, y: -20 });
 });
 
+test('panIntoView: bounds that fit the area but not inside the margin get what margin is left', () => {
+  // 20–110 is 90 long: it fits the 0–100 area, not the 10–90 a margin of 10
+  // leaves. The margin shrinks to the 5 left on each side, so it moves up by
+  // 15 to 5–95, clear of both edges, rather than being treated as too big
+  assert.deepStrictEqual(panIntoView([[40, 20], [50, 110]], AREA, ID, 10), { k: 1, x: 0, y: -15 });
+  // Already inside that reduced margin: no move
+  const t = { k: 1, x: 0, y: 0 };
+  assert.strictEqual(panIntoView([[40, 5], [50, 95]], AREA, t, 10), t);
+});
+
+test('panIntoView: bounds larger than the area keep the full margin', () => {
+  // 40–200 with a margin of 10: the top lands at 10, as without the change
+  assert.deepStrictEqual(panIntoView([[10, 40], [20, 200]], AREA, ID, 10), { k: 1, x: 0, y: -30 });
+});
+
 test('panIntoView: bounds larger than the area align the edge that was inside', () => {
   // 40–200 is longer than the 100-tall area; its top is inside, so it moves
   // up until the top meets the area's top, covering the whole area
@@ -143,4 +158,42 @@ test('panIntoView: a pan in an area that does not start at zero', () => {
   // Area y 30–70 (the band between the panels): 60–80 moves up by 10
   assert.deepStrictEqual(
     panIntoView([[0, 60], [10, 80]], [[0, 30], [100, 70]], ID), { k: 1, x: 0, y: -10 });
+});
+
+/* === visibleBand === */
+
+// A 1440×900 window over a 960×600 viewBox at 1.5 px per unit: no letterbox
+const FULL = [[0, 0], [960, 600]];
+const MAP = { left: 0, right: 1440 };
+const CTM = { a: 1.5, d: 1.5, e: 0, f: 0 };
+
+test('visibleBand: the band between two panels, in viewBox units', () => {
+  // Game panel bottom at 96 px, bottom stack top at 750 px
+  assert.deepStrictEqual(visibleBand(MAP, 96, 750, CTM, FULL), [[0, 64], [960, 500]]);
+});
+
+test('visibleBand: a panel in the letterbox takes nothing away', () => {
+  // A 400×800 phone over the same viewBox at 400/960 px per unit: the map
+  // is 250 px tall, centred, so the viewBox spans y 275–525 on screen. A
+  // game panel ending at 80 px and a stack starting at 530 px are both in
+  // the letterbox
+  const ctm = { a: 400 / 960, d: 400 / 960, e: 0, f: 275 };
+  assert.deepStrictEqual(visibleBand({ left: 0, right: 400 }, 80, 530, ctm, FULL), FULL);
+});
+
+test('visibleBand: a stack reaching into the viewBox from the letterbox', () => {
+  const ctm = { a: 400 / 960, d: 400 / 960, e: 0, f: 275 };
+  const [[, y0], [, y1]] = visibleBand({ left: 0, right: 400 }, 80, 500, ctm, FULL);
+  assert.strictEqual(y0, 0);
+  assert.strictEqual(y1, 540);
+});
+
+test('visibleBand: panels covering the whole height fall back to the viewBox', () => {
+  assert.deepStrictEqual(visibleBand(MAP, 500, 400, CTM, FULL), FULL);
+  assert.deepStrictEqual(visibleBand(MAP, 500, 500, CTM, FULL), FULL);
+});
+
+test('visibleBand: a band entirely in the letterbox falls back to the viewBox', () => {
+  const ctm = { a: 400 / 960, d: 400 / 960, e: 0, f: 275 };
+  assert.deepStrictEqual(visibleBand({ left: 0, right: 400 }, 600, 700, ctm, FULL), FULL);
 });

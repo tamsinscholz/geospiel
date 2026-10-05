@@ -137,20 +137,43 @@ modes. The four toggles show only for a landmark mode (CSS off `data-settings-mo
 - A thin progress bar along the bottom edge. At the start of a round it stands at
   rounds completed ÷ total; it moves up one step when the round reaches feedback.
 
-**Zoom at round start:**
-- **Bundesland finden, Bundesland benennen, Gewässer & Städte finden:** the map stays on
-  the full-Germany overview. If the map has moved (the user zoomed in or panned, or
-  the finden modes' feedback pan, section 10, moved it), it returns to the overview (300 ms);
-  on the untouched overview nothing moves.
-- **Landeshauptstadt benennen, Gewässer & Städte benennen:** gentle zoom to the target
-  (750 ms), into the **visible area**: the part of the map between the game panel and the
-  input panel, so the target never ends up under either. The scale fits the Bundesland,
-  or the feature's projected bounds, at 0.9 of that area but is capped at 1.8× (and never
+**Map motion** ([ADR 0003](adr/0003-map-motion-policy-per-mode.md)): one table,
+`MAP_MOTION` in `main.js`, says what the map does in each quiz mode at round start and
+in feedback, and `moveMap()` carries it out. Erkunden doesn't move the map.
+
+| Mode | Round start | Feedback |
+|---|---|---|
+| Bundesland finden | `overview` | `reveal` |
+| Bundesland benennen | `overview` | `none` |
+| Landeshauptstadt benennen | `fit` | `reveal` |
+| Gewässer & Städte finden | `overview` | `reveal` |
+| Gewässer & Städte benennen | `fit` | `reveal` |
+
+- **`overview`:** the map stays on the full-Germany overview. If the map has moved (the
+  user zoomed in or panned, or a `reveal` in feedback moved it), it returns to the
+  overview (300 ms); on the untouched overview nothing moves.
+- **`fit`**, the gentle travel, once per round: zoom to the target (750 ms) into the
+  **visible area as it will be in feedback**: the part of the map below the game panel
+  and above the feedback bar plus the info panel, so neither the input panel now nor
+  the feedback stack later covers the target. The feedback stack isn't laid out while
+  playing, so its height is remembered from earlier feedback at the same window size,
+  for the same kind of info panel (Bundesland, river, lake, city, Landeshauptstadt; the
+  largest seen, since a long answer can wrap the feedback line). A kind not seen yet
+  uses the largest of the others. Before the first feedback at this window size (the
+  first round of a game, or the first after a resize) it fits above the input panel
+  instead, and `reveal` catches the difference. The scale fits the Bundesland, or the
+  feature's projected bounds, at 0.9 of that area but is capped at 1.8× (and never
   goes below 1×), so a small target still shows most of Germany around it. Lakes and
   cities (a point has no extent) always hit the cap; the longest rivers stop short of it
-  (at 1440×900: Elbe 1.51×, Donau 1.56×, Rhein 1.30×). The target is centred in the
-  visible area as far as the widened pan clamp allows: a target at Germany's edge (the
-  Bodensee, Kiel) sits nearer that edge of the area, but clear of the panel.
+  (at 1440×900: Rhein 1.28×). The target is centred in the area as far as the widened
+  pan clamp allows: a target at Germany's edge (the Bodensee, Kiel) sits nearer that
+  edge of the area, but clear of the panels.
+- **`reveal`:** if the target is covered by the panels (the game panel, or the feedback
+  bar and the info panel), the map pans, by the smallest translation that brings the
+  target's bounds, plus 24 screen px (less if that is all the room there is), into the
+  visible area (750 ms). The scale stays exactly as it is. A target already clear
+  doesn't move the map at all. See section 10.
+- **`none`:** the map stays where it is.
 
 **User actions available in every quiz mode:**
 - **Überspringen** (playing only): counts the round as skipped and goes straight to the
@@ -291,16 +314,18 @@ it sits on a river (Köln, Mainz, Dresden). Ties go city, then lake, then river.
 - The target is highlighted (`.target`) in every mode, including Bundesland finden. In
   the landmark modes it is orange (in Gewässer & Städte finden it turns orange only now) (a river 4 px over a white casing, a lake
   filled, a city dot 6 px), and a lake or city gets an orange ring of 18 screen px.
-- **Zoom:** only Landeshauptstadt benennen and Gewässer & Städte benennen re-centre on
-  the target (750 ms, capped at 1.8×), bringing it back if the user zoomed or panned away.
-  They fit it into the visible area above the feedback bar and the info panel, which
-  are taller than the input panel, so the map usually moves up a little. Bundesland benennen stays where
-  it is, which is the overview unless the user has zoomed in.
-- **Bundesland finden and Gewässer & Städte finden** don't zoom either, but if the target
-  is covered by the panels (the game panel, or the feedback bar and the info panel), the
-  map pans, by the smallest translation that brings the target's bounds, plus 24 screen
-  px, into the visible area (750 ms). The scale stays exactly as it is: 1×, or whatever
-  the user zoomed to. A target already clear doesn't move the map at all (Mainz, the
+- **Map motion** (the table in section 4): no mode zooms in feedback. Bundesland
+  benennen (`none`) stays where it is, which is the overview unless the user has zoomed
+  in. Landeshauptstadt benennen and Gewässer & Städte benennen already travelled at
+  round start, into the band feedback leaves, so from the second round of a game on
+  the map doesn't move at all; in the first round (or the first after a window resize)
+  it may pan a little.
+- **`reveal`** (every quiz mode but Bundesland benennen): if the target is covered by
+  the panels (the game panel, or the feedback bar and the info panel), the map pans, by
+  the smallest translation that brings the target's bounds, plus 24 screen px, into the
+  visible area (750 ms); a target that fits the area but not with 24 px to spare gets
+  what margin is left, split evenly. The scale stays exactly as it is: 1× in the finden
+  modes, or whatever the user zoomed or the round-start travel reached. A target already clear doesn't move the map at all (Mainz, the
   Elbe, Hessen on a desktop). A target bigger than the visible area (Bayern when zoomed
   in) is panned just far enough to cover the whole area, so as much of it as possible
   shows: the edge that was in view meets the area's edge. On the overview at 1440×900

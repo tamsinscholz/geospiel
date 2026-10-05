@@ -55,10 +55,18 @@ are German.
   bottom stack, as laid out at the time of the call (so it is called after `setPhase`),
   converted from screen px through the SVG's screen CTM (`screenToViewBox` in
   `view-fit.mjs`, which takes the letterbox offset `e`/`f` into account), then
-  intersected with the viewBox. Panels in a letterbox take nothing away. In the `idle`
-  phase (menu, Erkunden) it is the whole viewBox.
+  intersected with the viewBox (`visibleBand`). Panels in a letterbox take nothing away. In the `idle`
+  phase (menu, Erkunden) it is the whole viewBox. `visibleArea(stackInset)` takes an
+  assumed bottom stack, in screen px above the map's bottom edge, for one not laid out yet.
+- **Motion area (`motionArea()`):** the visible area, except while playing a `fit` mode
+  (Landeshauptstadt benennen, Gewässer & Städte benennen), where its bottom is the higher
+  of the input panel and the remembered feedback stack (`feedbackInset()`): the band
+  feedback will leave. `rememberFeedbackStack()` measures the stack in every feedback,
+  per info-panel kind (`bundesland`, river, lake, city, capital), keeping the largest
+  seen and the map size it was seen at; a different map size (a resize) leaves nothing
+  remembered, and then this is the playing band.
 - **Pan clamp:** `translateExtent` is the viewBox rectangle itself, and a custom
-  `zoom.constrain()` runs d3's default clamp with the visible area as the viewport
+  `zoom.constrain()` runs d3's default clamp with the motion area as the viewport
   instead of the whole viewBox. So the viewBox only has to cover the visible area:
   Germany's top and bottom edges can move out from under the panels, by the panels'
   height in screen px at every `k`, also at `k = 1`. With no panels showing (the menu,
@@ -66,14 +74,19 @@ are German.
   20-unit margin at higher `k`. The overview at rest (`k = 1`, no translation) satisfies
   both, so it looks the same. Drags, wheel and pinch use it, and programmatic zooms call
   `zoom.constrain()` themselves.
-- **Gentle zoom (`zoomToBounds(bounds)`):** 750 ms transition to fit projected bounds at
-  0.9 of the visible area, centred in it, capped at `TARGET_ZOOM_MAX = 1.8` (a point's
+- **Map motion (`MAP_MOTION`, `moveMap(moment, id)`):** per quiz mode, the policy at
+  round start and in feedback (`overview`, `fit`, `reveal`, `none`; the table is in
+  `docs/game-flow.md` section 4 and ADR 0003).
+- **Gentle zoom (`fit`, `zoomToBounds(bounds)`):** 750 ms transition to fit projected bounds at
+  0.9 of the motion area, centred in it, capped at `TARGET_ZOOM_MAX = 1.8` (a point's
   zero bounds hit the cap) and floored at `k = 1` (`fitBounds` in `view-fit.mjs`), then
-  clamped. It runs after `setPhase`, so it fits above the input panel while playing and
-  above the feedback bar and info panel in feedback. Used in Landeshauptstadt benennen, with the Bundesland's bounds, and in Gewässer
+  clamped. It runs at round start after `setPhase`, so it fits above the feedback stack
+  as remembered (or above the input panel before any feedback at this size). Used in Landeshauptstadt benennen, with the Bundesland's bounds, and in Gewässer
   & Städte benennen, with the feature's (`landmarkBounds(id)`: a river's or lake's
-  `pathGenerator.bounds`, a city's point as zero bounds), at round start and in feedback.
-  `resetZoom` animates back to `k = 1` in 300 ms.
+  `pathGenerator.bounds`, a city's point as zero bounds).
+  `resetZoom` (`overview`) animates back to `k = 1` in 300 ms.
+- **Feedback pan (`reveal`, `panToBounds(bounds)`):** pan only, keeping `k`, and only if
+  the target is covered in feedback; see `docs/game-flow.md` section 10.
 - **Touch halo (`.hit-target`):** for each Bundesland with `area_km2` below
   `SMALL_TARGET_MAX_AREA_KM2 = 1000` (Berlin, Bremen, Hamburg), a duplicate path of its
   own geometry with `fill: none; stroke: transparent; stroke-linejoin: round`. It is
@@ -105,7 +118,7 @@ are German.
   - **Constant screen size:** strokes are non-scaling; the dot and marker radii are set
     in viewBox units by the zoom handler (`sizeLandmarks()`: screen px ÷ px per viewBox
     unit ÷ `k`). The handler runs on every frame of a zoom transition too, so the
-    ring stays 18 px while the gentle zoom or the finden modes' feedback pan moves the map
+    ring stays 18 px while the gentle zoom or the feedback pan moves the map
 - **Bundesländer in the landmark modes** (playing or feedback): quieter fill `#e6e6e2`,
   stroke `#9a9a94`, `pointer-events: none`, no hover; the touch halos are inert.
 - **Touch interaction (Erkunden):** tapping a Bundesland highlights it and opens the info

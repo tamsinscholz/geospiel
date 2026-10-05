@@ -38,9 +38,17 @@ The maintainer also asked for the feedback pan to be a per-mode option.
 2. **Travel once per round.** In the travelling modes, round start fits the target into
    the band it will have in feedback, so the feedback stack doesn't cover it later.
    Feedback is `reveal`, a safety net that usually doesn't move. The feedback stack
-   isn't laid out while playing, so its height is taken from the last measurement for
-   the current window size. Before the first measurement it falls back to the playing
-   band, and `reveal` catches any difference.
+   isn't laid out while playing, so its height is remembered from feedback at the
+   current window size. It is kept **per kind of facts box** (Bundesland, river, lake,
+   city, Landeshauptstadt), as the **largest** seen. A kind not seen yet uses the
+   largest of the others. Before the first measurement at a size, `fit` falls back to
+   the playing band, and `reveal` catches any difference.
+
+   *Amended 2026-10-05, during implementation:* the draft said "the last measurement".
+   The kinds differ by up to about 100 px on a phone (a river's stack top at 663 px,
+   a city's at 545–575), so "last" made a lake after a river pan in feedback. One
+   maximum across all kinds over-shrank the band and dropped the Rhein's zoom on a phone
+   from 1.61 to 1.24.
 
 3. **The table on 2026-10-05:**
 

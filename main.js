@@ -1,6 +1,6 @@
 import { createGame, landmarkPool, landmarkType, followRounds } from './game-core.mjs';
 import { nearestLandmark } from './landmark-hit.mjs';
-import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './view-fit.mjs';
+import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
 
 (() => {
   /* === DOM References === */
@@ -97,10 +97,28 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
   const MARKER_PX = 18;
   const HIT_RADIUS_PX = 12;
 
-  /** The finden modes' feedback pan keeps the target this far inside the
+  /** The feedback pan (`reveal`) keeps the target this far inside the
    *  visible area, in screen px: past the marker ring's 18 px radius, so a
    *  city's or lake's ring clears the panels too. */
   const FEEDBACK_PAN_MARGIN_PX = 24;
+
+  /** What the map does in each quiz mode at round start and in feedback
+   *  (ADR 0003), carried out by moveMap(). The policies:
+   *  - `overview`: back to the overview, which moves only if the map moved
+   *    (the user zoomed or panned, or a feedback pan);
+   *  - `fit`: the gentle travel, zoom and pan to fit the target into the
+   *    band feedback will leave (above the feedback bar and the info panel),
+   *    so feedback doesn't cover it later;
+   *  - `reveal`: pan only, keep `k`, and only if the target is covered;
+   *  - `none`: no movement.
+   *  Erkunden isn't listed: it doesn't move the map. */
+  const MAP_MOTION = {
+    'find':            { roundStart: 'overview', feedback: 'reveal' },
+    'name-bundesland': { roundStart: 'overview', feedback: 'none' },
+    'name-capital':    { roundStart: 'fit',      feedback: 'reveal' },
+    'find-landmark':   { roundStart: 'overview', feedback: 'reveal' },
+    'name-landmark':   { roundStart: 'fit',      feedback: 'reveal' },
+  };
 
   /** How long a wrongly clicked Bundesland or landmark flashes red. */
   const WRONG_FLASH_MS = 600;
@@ -140,6 +158,17 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
 
   /** The current game-core instance; null outside a quiz. */
   let game = null;
+
+  /** The feedback stack (feedback bar + info panel) as laid out in
+   *  feedback: how far its top sits above the map's bottom edge, in screen
+   *  px, and the map size it was measured at, by the kind of target (the
+   *  info panel's rows: `bundesland`, or landmarkType()'s river, lake, city,
+   *  capital). While playing the stack isn't laid out, so `fit` plans with
+   *  this. Each kind keeps the largest inset seen at that size, so a feedback
+   *  line wrapped by a long answer, or a lake with a Wappen, sets the band and
+   *  `reveal` stays a no-op for the shorter ones. A different map size (a
+   *  window resize) makes it stale; see feedbackInset(). */
+  const feedbackInsets = {};
 
   /* === State Transitions === */
   function setPhase(phase) {
@@ -391,8 +420,10 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
    *  phase just set, so call it after setPhase. Outside a quiz round (the
    *  menu, Erkunden) it is the whole viewBox: Erkunden's info panel comes and
    *  goes with the pointer and doesn't count. Panels in a letterbox, off the
-   *  viewBox, take nothing away. */
-  function visibleArea() {
+   *  viewBox, take nothing away. `stackInset` (screen px above the map's
+   *  bottom edge), when given, stands in for a bottom stack that isn't laid
+   *  out yet; the higher of it and the laid-out stack wins. */
+  function visibleArea(stackInset = null) {
     const full = viewBoxExtent();
     const ctm = svgNode.getScreenCTM();
     if (!ctm || gameState.phase === 'idle') return full;
@@ -403,22 +434,73 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
     for (const panel of bottomPanels.children) {
       if (panel.getClientRects().length) bottom = Math.min(bottom, panel.getBoundingClientRect().top);
     }
-    // Panels covering the whole height (a tiny window) leave nothing to fit
-    // into; fall back to the whole viewBox rather than an empty area
-    const area = bottom > top &&
-      intersectExtents(screenToViewBox([[map.left, top], [map.right, bottom]], ctm), full);
-    return area && area[1][1] > area[0][1] ? area : full;
+    if (stackInset !== null) bottom = Math.min(bottom, map.bottom - stackInset);
+    return visibleBand(map, top, bottom, ctm, full);
   }
 
-  /** The gentle zoom: fit projected `bounds` (`[[x0, y0], [x1, y1]]`, viewBox
-   *  units) at 0.9 of the visible area, centred in it, capped at
+  /** The area the map's motion works in, the pan clamp included: the visible
+   *  area, except while playing a `fit` mode, where it is the band feedback
+   *  will leave, planned with the remembered feedback stack. The round-start
+   *  travel fits into it, and the clamp allows that landing. Before the first
+   *  feedback at this size it is the playing band. */
+  function motionArea() {
+    const planAhead = gameState.phase === 'playing' &&
+      MAP_MOTION[gameState.mode] && MAP_MOTION[gameState.mode].roundStart === 'fit';
+    return visibleArea(planAhead ? feedbackInset() : null);
+  }
+
+  /** The map's size, as the key a remembered feedback stack is valid for. */
+  function mapSizeKey() {
+    const { width, height } = svgNode.getBoundingClientRect();
+    return `${width}x${height}`;
+  }
+
+  /** The kind of info panel feedback shows for target `id`, which sets the
+   *  feedback stack's height: a key of feedbackInsets. */
+  function factsKind(id) {
+    return isLandmarkMode(gameState.mode) ? landmarkType(landmarksData[id]) : 'bundesland';
+  }
+
+  /** Measure the feedback stack, now laid out, and remember its inset for
+   *  the current target's kind at this map size, keeping the largest. Call
+   *  after setPhase('feedback'). */
+  function rememberFeedbackStack() {
+    const map = svgNode.getBoundingClientRect();
+    let top = map.bottom;
+    for (const panel of bottomPanels.children) {
+      if (panel.getClientRects().length) top = Math.min(top, panel.getBoundingClientRect().top);
+    }
+    const kind = factsKind(game.state.targetId);
+    const size = mapSizeKey();
+    const known = feedbackInsets[kind];
+    const inset = map.bottom - top;
+    feedbackInsets[kind] = {
+      size,
+      inset: known && known.size === size ? Math.max(known.inset, inset) : inset,
+    };
+  }
+
+  /** The remembered feedback stack's inset for the current target: its
+   *  kind's at the current map size, else the largest of any kind's at this
+   *  size (a kind not seen yet, planned with room to spare), else null (no
+   *  feedback yet at this size, or the window was resized since): then `fit`
+   *  falls back to the playing band. */
+  function feedbackInset() {
+    const size = mapSizeKey();
+    const own = feedbackInsets[factsKind(game.state.targetId)];
+    if (own && own.size === size) return own.inset;
+    const others = Object.values(feedbackInsets).filter(m => m.size === size).map(m => m.inset);
+    return others.length ? Math.max(...others) : null;
+  }
+
+  /** The gentle zoom (`fit`): fit projected `bounds` (`[[x0, y0], [x1,
+   *  y1]]`, viewBox units) at 0.9 of motionArea(), centred in it, capped at
    *  TARGET_ZOOM_MAX. A point's zero bounds simply hit the cap. Never below
    *  the overview: in a very short window a large target fits only partly.
-   *  The visible area depends on the phase's panels, so call it after
-   *  setPhase. */
+   *  The area depends on the phase's panels, so call it after setPhase. */
   function zoomToBounds(bounds, duration = 750) {
     if (!bounds) return;
-    const { k, x, y } = fitBounds(bounds, visibleArea(),
+    const { k, x, y } = fitBounds(bounds, motionArea(),
       { fill: 0.9, minScale: MIN_ZOOM, maxScale: TARGET_ZOOM_MAX });
 
     // zoom.transform does not apply the pan clamp by itself, so constrain the
@@ -429,7 +511,7 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
       .call(zoom.transform, target);
   }
 
-  /** The finden modes' feedback pan: only if `bounds` are covered, i.e. not
+  /** The feedback pan (`reveal`): only if `bounds` are covered, i.e. not
    *  inside the visible area under the current transform, pan by the
    *  smallest translation that brings them FEEDBACK_PAN_MARGIN_PX inside it,
    *  keeping `k`, within the pan clamp. A target too big for the area is
@@ -454,6 +536,18 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
   function resetZoom(duration = 300) {
     d3.select('#map').transition().duration(duration)
       .call(zoom.transform, d3.zoomIdentity);
+  }
+
+  /** Carry out the current mode's MAP_MOTION policy for `moment`
+   *  (`roundStart` or `feedback`) on the target `id`. Call after setPhase,
+   *  so the areas are measured with that phase's panels. */
+  function moveMap(moment, id) {
+    const policy = MAP_MOTION[gameState.mode] && MAP_MOTION[gameState.mode][moment];
+    const bounds = () => isLandmarkMode(gameState.mode) ? landmarkBounds(id) : bundeslandBounds(id);
+    // overview: on the untouched overview the reset changes nothing
+    if (policy === 'overview') resetZoom();
+    else if (policy === 'fit') zoomToBounds(bounds());
+    else if (policy === 'reveal') panToBounds(bounds());
   }
 
   /* === Data Loading === */
@@ -550,19 +644,21 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
     // The zoom extent defaults to the viewBox, and the translate extent is the
     // same rectangle: Germany plus the padding margin. d3's own clamp keeps
     // the translate extent covering the whole viewBox. Ours only asks it to
-    // cover the visible area (visibleArea()), so Germany's top and bottom
-    // edges can move out from under the panels: extra room equal to the
-    // panels' height, in screen px, at every k. With no panels showing that
-    // is d3's clamp exactly, and at rest the overview (k = 1, no translation)
-    // satisfies both. It applies to drags, wheel and pinch, and to the
-    // programmatic travels, which call zoom.constrain() themselves.
+    // cover the area the map's motion works in (motionArea(): the visible
+    // area, or, while playing a `fit` mode, the band feedback will leave), so
+    // Germany's top and bottom edges can move out from under the panels:
+    // extra room equal to the panels' height, in screen px, at every k. With
+    // no panels showing that is d3's clamp exactly, and at rest the overview
+    // (k = 1, no translation) satisfies both. It applies to drags, wheel and
+    // pinch, and to the programmatic travels, which call zoom.constrain()
+    // themselves.
     zoom = d3.zoom();
     const clampToArea = zoom.constrain();
     zoom
       .scaleExtent([MIN_ZOOM, MAX_ZOOM])
       .translateExtent(viewBoxExtent())
       .constrain((transform, extent, translateExtent) =>
-        clampToArea(transform, visibleArea(), translateExtent))
+        clampToArea(transform, motionArea(), translateExtent))
       // d3's smooth zoom breaks down when the two views are centred almost,
       // but not exactly, on the same point (e.g. resetting after a wheel zoom
       // at the map's centre): its duration comes out non-finite and every
@@ -901,18 +997,13 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
 
     setPhase('playing');
 
-    // Only Landeshauptstadt benennen and Gewässer & Städte benennen travel to
-    // the target, location to location. The other quiz modes stay on the
-    // overview: zooming in for feedback and back out for the next round, every
-    // round, is tiring. They return to the overview only if the user has
-    // zoomed in themselves or the finden modes' feedback pan moved the map
-    // (on the untouched overview the reset changes nothing), which in
-    // Bundesland finden also keeps the start un-zoomed, so the map gives
-    // nothing away. Gewässer & Städte finden is one of these. The travel
-    // comes after setPhase, so it fits the target above the input panel.
-    if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
-    else if (gameState.mode === 'name-landmark') zoomToBounds(landmarkBounds(id));
-    else resetZoom();
+    // MAP_MOTION: the travelling modes (Landeshauptstadt benennen, Gewässer &
+    // Städte benennen) travel here, once per round, location to location, into
+    // the band feedback will leave. The others stay on the overview: zooming
+    // in for feedback and back out every round is tiring, and in Bundesland
+    // finden an un-zoomed start gives nothing away. After setPhase, so the
+    // areas are measured with the playing panels.
+    moveMap('roundStart', id);
 
     if (gameState.mode === 'name-landmark') {
       // The target shows while playing here (orange, marker for lakes and
@@ -971,14 +1062,12 @@ import { screenToViewBox, intersectExtents, fitBounds, panIntoView } from './vie
 
     setPhase('feedback');
 
-    // Re-centre on the target only where the round is already zoomed to it,
-    // fitting it above the feedback bar and the info panel, now laid out.
-    // The finden modes stay where they are, unless the target is covered by
-    // the panels: then a small pan, no zoom, brings it clear
-    if (gameState.mode === 'name-capital') zoomToBounds(bundeslandBounds(id));
-    else if (gameState.mode === 'name-landmark') zoomToBounds(landmarkBounds(id));
-    else if (gameState.mode === 'find') panToBounds(bundeslandBounds(id));
-    else if (gameState.mode === 'find-landmark') panToBounds(landmarkBounds(id));
+    // The feedback stack is laid out now: remember it for the next round's
+    // `fit`. Then MAP_MOTION: mostly `reveal`, which pans only if the target
+    // is covered (the first round at a window size, or a finden mode's target
+    // at the overview's edge) and otherwise leaves the map where it is
+    rememberFeedbackStack();
+    moveMap('feedback', id);
 
     if (gameState.autoAdvance) {
       gameState.advanceTimer = setTimeout(advanceRound, 1800);
