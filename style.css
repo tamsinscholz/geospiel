@@ -105,7 +105,10 @@ body[data-mode$="-landmark"] .hit-target { pointer-events: none; }
   -webkit-backdrop-filter: blur(4px);
   z-index: 100;
   display: none;
-  align-items: center; justify-content: center;
+  /* A card taller than the screen (six mode cards in one column on a phone)
+     scrolls; the card's auto margins centre it only when it fits, so its top
+     is never pushed off-screen out of reach */
+  overflow-y: auto; overscroll-behavior: contain;
   padding: 20px;
 }
 body[data-screen="select"] #screen-select { display: flex; }
@@ -114,6 +117,7 @@ body[data-screen="stats"] #screen-stats { display: flex; }
 
 /* Overlay Card */
 .overlay-card {
+  margin: auto;
   background: rgba(255,255,255,0.97);
   border-radius: 20px;
   padding: 36px 40px;
