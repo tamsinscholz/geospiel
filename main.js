@@ -114,7 +114,7 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
    *  Erkunden isn't listed: it doesn't move the map. */
   const MAP_MOTION = {
     'find':            { roundStart: 'overview', feedback: 'reveal' },
-    'name-bundesland': { roundStart: 'overview', feedback: 'none' },
+    'name-bundesland': { roundStart: 'overview', feedback: 'reveal' },
     'name-capital':    { roundStart: 'fit',      feedback: 'reveal' },
     'find-landmark':   { roundStart: 'overview', feedback: 'reveal' },
     'name-landmark':   { roundStart: 'fit',      feedback: 'reveal' },

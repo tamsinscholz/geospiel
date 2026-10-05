@@ -144,7 +144,7 @@ in feedback, and `moveMap()` carries it out. Erkunden doesn't move the map.
 | Mode | Round start | Feedback |
 |---|---|---|
 | Bundesland finden | `overview` | `reveal` |
-| Bundesland benennen | `overview` | `none` |
+| Bundesland benennen | `overview` | `reveal` |
 | Landeshauptstadt benennen | `fit` | `reveal` |
 | Gewässer & Städte finden | `overview` | `reveal` |
 | Gewässer & Städte benennen | `fit` | `reveal` |
@@ -320,7 +320,7 @@ it sits on a river (Köln, Mainz, Dresden). Ties go city, then lake, then river.
   round start, into the band feedback leaves, so from the second round of a game on
   the map doesn't move at all; in the first round (or the first after a window resize)
   it may pan a little.
-- **`reveal`** (every quiz mode but Bundesland benennen): if the target is covered by
+- **`reveal`** (every quiz mode): if the target is covered by
   the panels (the game panel, or the feedback bar and the info panel), the map pans, by
   the smallest translation that brings the target's bounds, plus 24 screen px, into the
   visible area (750 ms); a target that fits the area but not with 24 px to spare gets

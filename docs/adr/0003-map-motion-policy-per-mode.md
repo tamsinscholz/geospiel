@@ -55,14 +55,17 @@ The maintainer also asked for the feedback pan to be a per-mode option.
    | Mode | Round start | Feedback |
    |---|---|---|
    | Bundesland finden | `overview` | `reveal` |
-   | Bundesland benennen | `overview` | `none` |
+   | Bundesland benennen | `overview` | `none` → `reveal` (2026-10-05, see below) |
    | Landeshauptstadt benennen | `fit` | `reveal` |
    | Gewässer & Städte finden | `overview` | `reveal` |
    | Gewässer & Städte benennen | `fit` | `reveal` |
 
-   Erkunden doesn't move the map. Bundesland benennen stays `none`, which is unchanged
-   behaviour. Bayern can still sit under the facts box there, and switching that mode to
-   `reveal` is a one-cell change left for the maintainer.
+   Erkunden doesn't move the map. Bundesland benennen started as `none`, which was
+   unchanged behaviour, so Bayern could still sit under the facts box there.
+
+   *Amended 2026-10-05:* the maintainer switched Bundesland benennen's feedback to
+   `reveal`, like the finden modes. Every quiz mode now pans a covered target clear in
+   feedback, and `none` is currently unused.
 
 ## Rejected alternatives
 
