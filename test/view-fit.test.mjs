@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert';
 
-import { screenToViewBox, intersectExtents, visibleBand, fitBounds, panIntoView } from '../view-fit.mjs';
+import {
+  screenToViewBox, intersectExtents, visibleBand, fitBounds, panIntoView,
+  viewportInsets, pinnedBand, tightestBand,
+} from '../view-fit.mjs';
 
 /* === screenToViewBox === */
 
@@ -196,4 +199,60 @@ test('visibleBand: panels covering the whole height fall back to the viewBox', (
 test('visibleBand: a band entirely in the letterbox falls back to the viewBox', () => {
   const ctm = { a: 400 / 960, d: 400 / 960, e: 0, f: 275 };
   assert.deepStrictEqual(visibleBand({ left: 0, right: 400 }, 600, 700, ctm, FULL), FULL);
+});
+
+/* === viewportInsets === */
+
+test('viewportInsets: no keyboard hides nothing', () => {
+  assert.deepStrictEqual(viewportInsets({ offsetTop: 0, height: 800 }, 800), { top: 0, bottom: 0 });
+});
+
+test('viewportInsets: an overlaid keyboard hides the bottom', () => {
+  // Android: the visual viewport shrinks, nothing scrolls
+  assert.deepStrictEqual(viewportInsets({ offsetTop: 0, height: 440 }, 800), { top: 0, bottom: 360 });
+});
+
+test('viewportInsets: a scrolled visual viewport hides the top too', () => {
+  // iOS: the same keyboard, and the browser scrolled 120 px to the field
+  assert.deepStrictEqual(viewportInsets({ offsetTop: 120, height: 440 }, 800), { top: 120, bottom: 240 });
+});
+
+test('viewportInsets: fractions of a px are kept above one px', () => {
+  assert.deepStrictEqual(viewportInsets({ offsetTop: 0.5, height: 439.5 }, 800), { top: 0, bottom: 360 });
+});
+
+test('viewportInsets: sub-px differences and overshoot are no inset', () => {
+  assert.deepStrictEqual(viewportInsets({ offsetTop: 0, height: 899.33 }, 900), { top: 0, bottom: 0 });
+  assert.deepStrictEqual(viewportInsets({ offsetTop: -3, height: 810 }, 800), { top: 0, bottom: 0 });
+});
+
+test('viewportInsets: no visual viewport hides nothing', () => {
+  assert.deepStrictEqual(viewportInsets(undefined, 800), { top: 0, bottom: 0 });
+});
+
+/* === pinnedBand === */
+
+test('pinnedBand: panels move in by what the viewport hides', () => {
+  assert.deepStrictEqual(pinnedBand([60, 700], { top: 120, bottom: 240 }), [180, 460]);
+});
+
+test('pinnedBand: nothing hidden is the band at rest', () => {
+  assert.deepStrictEqual(pinnedBand([60, 700], { top: 0, bottom: 0 }), [60, 700]);
+});
+
+/* === tightestBand === */
+
+test('tightestBand: the top furthest down and the bottom furthest up', () => {
+  // playing band, input on the keyboard, the feedback stack
+  assert.deepStrictEqual(tightestBand([60, 700], [60, 340], [60, 520]), [60, 340]);
+  assert.deepStrictEqual(tightestBand([60, 700], [180, 460]), [180, 460]);
+});
+
+test('tightestBand: null bands are skipped', () => {
+  assert.deepStrictEqual(tightestBand([60, 700], null, [60, 520]), [60, 520]);
+  assert.strictEqual(tightestBand(null, null), null);
+});
+
+test('tightestBand: may be empty, for visibleBand to fall back from', () => {
+  assert.deepStrictEqual(tightestBand([0, 100], [200, 300]), [200, 100]);
 });

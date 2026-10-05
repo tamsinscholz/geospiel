@@ -99,3 +99,35 @@ function shiftInto(b0, b1, a0, a1, margin) {
   if (b1 < a1) return a1 - b1;
   return 0;
 }
+
+/** What the visual viewport (`{ offsetTop, height }`, CSS px, as
+ *  `window.visualViewport` reports it) hides of a layout viewport
+ *  `layoutHeight` px tall: `top` px scrolled out above it and `bottom` px
+ *  below it, where an on-screen keyboard overlays the page. Less than a px
+ *  counts as nothing (a fractional zoom ratio makes the two heights differ
+ *  by a fraction of a px, which is no keyboard), and neither is ever
+ *  negative. Without a visual viewport (an old browser) nothing is hidden. */
+export function viewportInsets(viewport, layoutHeight) {
+  if (!viewport) return { top: 0, bottom: 0 };
+  const { offsetTop, height } = viewport;
+  const px = v => v >= 1 ? v : 0;
+  return { top: px(offsetTop), bottom: px(layoutHeight - offsetTop - height) };
+}
+
+/** A screen band `[top, bottom]` (px) between panels pinned to the visual
+ *  viewport, when the viewport hides `insets` (`{ top, bottom }`, px; see
+ *  viewportInsets): `rest` is the band with nothing hidden, and the panels
+ *  move in by the hidden amounts. */
+export function pinnedBand([top, bottom], insets) {
+  return [top + insets.top, bottom - insets.bottom];
+}
+
+/** The tightest of several screen bands `[top, bottom]`: the top furthest
+ *  down and the bottom furthest up, the part every band leaves. Null bands (nothing
+ *  planned) are skipped; with none left it is null. The result may be
+ *  empty (`bottom <= top`), which visibleBand() falls back from. */
+export function tightestBand(...bands) {
+  const known = bands.filter(Boolean);
+  if (!known.length) return null;
+  return [Math.max(...known.map(b => b[0])), Math.min(...known.map(b => b[1]))];
+}

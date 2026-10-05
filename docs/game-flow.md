@@ -17,6 +17,12 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
   bottom stack, during a quiz round): Germany's edges can be pulled out from under them,
   even at 1×. With no panels (the menu, Erkunden) the map cannot move at 1×. At rest the
   overview is the same either way.
+- **On-screen keyboard** (phones, [ADR 0004](adr/0004-on-screen-keyboard-via-visual-viewport.md)):
+  the keyboard overlays the page, on Android and iOS alike; the map keeps its size and
+  is never re-fitted. The game panel and the bottom stack follow the part of the screen
+  still visible (the visual viewport): the input box rests directly on the keyboard,
+  and the game panel stays at the top of the visible screen even when the browser
+  scrolls the page to the field. With no keyboard open, nothing changes.
 - **Touch halo:** on touch or narrow screens (`(pointer: coarse), (max-width: 600px)`),
   the three Bundesländer under 1,000 km² (Berlin, Bremen, Hamburg) also catch taps up to
   about 10 screen px outside their outline. A tap there counts as a tap on that
@@ -161,7 +167,12 @@ in feedback, and `moveMap()` carries it out. Erkunden doesn't move the map.
   largest seen, since a long answer can wrap the feedback line). A kind not seen yet
   uses the largest of the others. Before the first feedback at this window size (the
   first round of a game, or the first after a resize) it fits above the input panel
-  instead, and `reveal` catches the difference. The scale fits the Bundesland, or the
+  instead, and `reveal` catches the difference. On a phone whose keyboard has opened
+  before at this window size, the band is tighter still: below the game panel and above
+  both the input box resting on that keyboard and the feedback stack, so neither the
+  keyboard opening nor feedback moves the map. A target too big for that band even at
+  1× (Niedersachsen, the Rhein, most Bundesländer at 360×640) overflows it at the
+  bottom, under the input box, where feedback has room for it. The scale fits the Bundesland, or the
   feature's projected bounds, at 0.9 of that area but is capped at 1.8× (and never
   goes below 1×), so a small target still shows most of Germany around it. Lakes and
   cities (a point has no extent) always hit the cap; the longest rivers stop short of it
@@ -173,6 +184,12 @@ in feedback, and `moveMap()` carries it out. Erkunden doesn't move the map.
   target's bounds, plus 24 screen px (less if that is all the room there is), into the
   visible area (750 ms). The scale stays exactly as it is. A target already clear
   doesn't move the map at all. See section 10.
+- **When the visible screen changes during a round** (the keyboard opens or closes, the
+  browser scrolls), the map does a `reveal` once the change has settled (150 ms
+  without a further change), wherever the target is on show: while playing a `fit`
+  mode, and in feedback. The first time a keyboard opens at a window size it may pan
+  once; after that it is remembered and the round-start travel already allows for it.
+  A finden round in play doesn't react: its target isn't shown yet.
 - **`none`:** the map stays where it is.
 
 **User actions available in every quiz mode:**
@@ -314,12 +331,12 @@ it sits on a river (Köln, Mainz, Dresden). Ties go city, then lake, then river.
 - The target is highlighted (`.target`) in every mode, including Bundesland finden. In
   the landmark modes it is orange (in Gewässer & Städte finden it turns orange only now) (a river 4 px over a white casing, a lake
   filled, a city dot 6 px), and a lake or city gets an orange ring of 18 screen px.
-- **Map motion** (the table in section 4): no mode zooms in feedback. Bundesland
-  benennen (`none`) stays where it is, which is the overview unless the user has zoomed
-  in. Landeshauptstadt benennen and Gewässer & Städte benennen already travelled at
-  round start, into the band feedback leaves, so from the second round of a game on
-  the map doesn't move at all; in the first round (or the first after a window resize)
-  it may pan a little.
+- **Map motion** (the table in section 4): no mode zooms in feedback. The three
+  benennen modes already travelled at round start, into the band feedback leaves, so
+  from the second round of a game on the map doesn't move at all; in the first round
+  (or the first after a window resize) it may pan a little. Feedback hides the input,
+  so an open on-screen keyboard closes: the `reveal` then waits until the screen has
+  settled (at most 500 ms), so it measures the screen without the keyboard.
 - **`reveal`** (every quiz mode): if the target is covered by
   the panels (the game panel, or the feedback bar and the info panel), the map pans, by
   the smallest translation that brings the target's bounds, plus 24 screen px, into the

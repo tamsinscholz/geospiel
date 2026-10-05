@@ -1,6 +1,6 @@
 import { createGame, landmarkPool, landmarkType, followRounds } from './game-core.mjs';
 import { nearestLandmark } from './landmark-hit.mjs';
-import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
+import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tightestBand } from './view-fit.mjs';
 
 (() => {
   /* === DOM References === */
@@ -102,6 +102,11 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
    *  city's or lake's ring clears the panels too. */
   const FEEDBACK_PAN_MARGIN_PX = 24;
 
+  /** Float noise, in viewBox units: a `reveal` pan shorter than this is no
+   *  pan (a target on the visible area's edge, a clamp undoing a pan). Far
+   *  below a px. */
+  const EDGE_NOISE = 1e-6;
+
   /** What the map does in each quiz mode at round start and in feedback
    *  (ADR 0003), carried out by moveMap(). The policies:
    *  - `overview`: back to the overview, which moves only if the map moved
@@ -119,6 +124,20 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
     'find-landmark':   { roundStart: 'overview', feedback: 'reveal' },
     'name-landmark':   { roundStart: 'fit',      feedback: 'reveal' },
   };
+
+  /** The on-screen keyboard (ADR 0004). It counts as open when the visual
+   *  viewport hides more than this fraction of the page's height: a browser
+   *  toolbar sliding in and out hides far less. */
+  const KEYBOARD_MIN_FRACTION = 0.15;
+
+  /** The visual viewport has settled once this long passes without a
+   *  resize or scroll event; only then does the map react (one `reveal`, not
+   *  a transition per event). */
+  const VIEWPORT_SETTLE_MS = 150;
+
+  /** Feedback hides the input, so an open keyboard closes. The feedback
+   *  `reveal` waits for that, at most this long if no viewport event comes. */
+  const KEYBOARD_CLOSE_WAIT_MS = 500;
 
   /** How long a wrongly clicked Bundesland or landmark flashes red. */
   const WRONG_FLASH_MS = 600;
@@ -169,6 +188,21 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
    *  `reveal` stays a no-op for the shorter ones. A different map size (a
    *  window resize) makes it stale; see feedbackInset(). */
   const feedbackInsets = {};
+
+  /** What the visual viewport hides right now, in screen px (`{ top,
+   *  bottom }`, see viewportInsets()), as last written to the CSS custom
+   *  properties the panels are pinned with. Measurements subtract it to get
+   *  a panel's resting position. */
+  let shownInsets = { top: 0, bottom: 0 };
+
+  /** The on-screen keyboard as last seen open: what it hid (`top`, `bottom`,
+   *  screen px, each the largest seen) and the map size it was seen at. While
+   *  playing, `fit` plans with it, as with the feedback stack; a different
+   *  map size makes it stale. Null until a keyboard opens. */
+  let keyboardSeen = null;
+
+  /** The pending reaction to a visual viewport change; see settleViewport(). */
+  let viewportTimer = null;
 
   /* === State Transitions === */
   function setPhase(phase) {
@@ -416,37 +450,56 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
 
   /** The part of the viewBox the user can see, as an extent in viewBox
    *  units: below the top game panel and above the bottom panel stack, as
-   *  they are laid out right now. Reading the layout makes it exact for the
-   *  phase just set, so call it after setPhase. Outside a quiz round (the
+   *  they are laid out right now, and within the visual viewport (an
+   *  on-screen keyboard hides the rest; the panels are pinned to it, so it
+   *  only shows where a panel isn't). Reading the layout makes it exact for
+   *  the phase just set, so call it after setPhase. Outside a quiz round (the
    *  menu, Erkunden) it is the whole viewBox: Erkunden's info panel comes and
    *  goes with the pointer and doesn't count. Panels in a letterbox, off the
-   *  viewBox, take nothing away. `stackInset` (screen px above the map's
-   *  bottom edge), when given, stands in for a bottom stack that isn't laid
-   *  out yet; the higher of it and the laid-out stack wins. */
-  function visibleArea(stackInset = null) {
+   *  viewBox, take nothing away.
+   *
+   *  Two plans, when given, narrow it to the tightest band of the round:
+   *  - `stackInset` (screen px above the map's bottom edge) stands in for a
+   *    bottom stack that isn't laid out yet: the feedback stack, which sits
+   *    with no keyboard open (feedback hides the input);
+   *  - `keyboard` (`{ top, bottom }`, screen px) is a keyboard that isn't
+   *    open now: the panels as they would be pinned above it. */
+  function visibleArea(stackInset = null, keyboard = null) {
     const full = viewBoxExtent();
     const ctm = svgNode.getScreenCTM();
     if (!ctm || gameState.phase === 'idle') return full;
     const map = svgNode.getBoundingClientRect();
+    // The band at rest: the panels where they sit with nothing hidden
     let top = map.top;
     let bottom = map.bottom;
-    if (gamePanel.getClientRects().length) top = Math.max(top, gamePanel.getBoundingClientRect().bottom);
-    for (const panel of bottomPanels.children) {
-      if (panel.getClientRects().length) bottom = Math.min(bottom, panel.getBoundingClientRect().top);
+    if (gamePanel.getClientRects().length) {
+      top = Math.max(top, gamePanel.getBoundingClientRect().bottom - shownInsets.top);
     }
-    if (stackInset !== null) bottom = Math.min(bottom, map.bottom - stackInset);
-    return visibleBand(map, top, bottom, ctm, full);
+    for (const panel of bottomPanels.children) {
+      if (panel.getClientRects().length) {
+        bottom = Math.min(bottom, panel.getBoundingClientRect().top + shownInsets.bottom);
+      }
+    }
+    const rest = [top, bottom];
+    const [bandTop, bandBottom] = tightestBand(
+      pinnedBand(rest, shownInsets),
+      stackInset !== null ? [rest[0], map.bottom - stackInset] : null,
+      keyboard && pinnedBand(rest, keyboard));
+    return visibleBand(map, bandTop, bandBottom, ctm, full);
   }
 
   /** The area the map's motion works in, the pan clamp included: the visible
-   *  area, except while playing a `fit` mode, where it is the band feedback
-   *  will leave, planned with the remembered feedback stack. The round-start
-   *  travel fits into it, and the clamp allows that landing. Before the first
-   *  feedback at this size it is the playing band. */
+   *  area, except while playing a `fit` mode, where it is the tightest band
+   *  of the round, planned with the remembered feedback stack and the
+   *  remembered keyboard: below the game panel, above the input box resting
+   *  on the keyboard and above the feedback stack. The round-start travel
+   *  fits into it, and the clamp allows that landing. With neither
+   *  remembered at this size (the first round, a desktop) it is the playing
+   *  band. */
   function motionArea() {
     const planAhead = gameState.phase === 'playing' &&
       MAP_MOTION[gameState.mode] && MAP_MOTION[gameState.mode].roundStart === 'fit';
-    return visibleArea(planAhead ? feedbackInset() : null);
+    return planAhead ? visibleArea(feedbackInset(), keyboardInsets()) : visibleArea();
   }
 
   /** The map's size, as the key a remembered feedback stack is valid for. */
@@ -463,12 +516,15 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
 
   /** Measure the feedback stack, now laid out, and remember its inset for
    *  the current target's kind at this map size, keeping the largest. Call
-   *  after setPhase('feedback'). */
+   *  after setPhase('feedback'). The inset is the stack's at rest: a keyboard
+   *  still closing has it pinned higher for a moment. */
   function rememberFeedbackStack() {
     const map = svgNode.getBoundingClientRect();
     let top = map.bottom;
     for (const panel of bottomPanels.children) {
-      if (panel.getClientRects().length) top = Math.min(top, panel.getBoundingClientRect().top);
+      if (panel.getClientRects().length) {
+        top = Math.min(top, panel.getBoundingClientRect().top + shownInsets.bottom);
+      }
     }
     const kind = factsKind(game.state.targetId);
     const size = mapSizeKey();
@@ -493,6 +549,75 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
     return others.length ? Math.max(...others) : null;
   }
 
+  /** Whether insets (`{ top, bottom }`, screen px) hide enough of the page
+   *  to be an on-screen keyboard. */
+  function isKeyboard({ top, bottom }) {
+    return top + bottom > KEYBOARD_MIN_FRACTION * window.innerHeight;
+  }
+
+  /** The remembered keyboard's insets at the current map size, or null (none
+   *  open yet at this size, or the window was resized since). */
+  function keyboardInsets() {
+    return keyboardSeen && keyboardSeen.size === mapSizeKey() ? keyboardSeen : null;
+  }
+
+  /** Remember an open keyboard's insets at this map size, keeping the
+   *  largest seen on each side. */
+  function rememberKeyboard(insets) {
+    const size = mapSizeKey();
+    const known = keyboardInsets();
+    keyboardSeen = {
+      size,
+      top: known ? Math.max(known.top, insets.top) : insets.top,
+      bottom: known ? Math.max(known.bottom, insets.bottom) : insets.bottom,
+    };
+  }
+
+  /** Pin the panels to the visual viewport (ADR 0004): write what it hides
+   *  to `--vv-top` and `--vv-bottom` on the root, which the game panel's
+   *  `top` and the bottom stack's `bottom` add (style.css). The map stays
+   *  full-page, so an on-screen keyboard never rescales it. A pinch-zoomed
+   *  page (scale off 1) or a browser without `visualViewport` counts as
+   *  nothing hidden: the panels stay where they are. */
+  function followViewport() {
+    const vv = window.visualViewport;
+    shownInsets = vv && Math.abs(vv.scale - 1) < 0.01
+      ? viewportInsets(vv, window.innerHeight)
+      : { top: 0, bottom: 0 };
+    const root = document.documentElement.style;
+    root.setProperty('--vv-top', `${shownInsets.top}px`);
+    root.setProperty('--vv-bottom', `${shownInsets.bottom}px`);
+    if (svgNode && isKeyboard(shownInsets)) rememberKeyboard(shownInsets);
+  }
+
+  /** React to the visual viewport once it has settled, `ms` after the last
+   *  call: each call restarts the wait. */
+  function settleViewport(ms = VIEWPORT_SETTLE_MS) {
+    clearTimeout(viewportTimer);
+    viewportTimer = setTimeout(onViewportSettled, ms);
+  }
+
+  /** The visible screen changed during a round (a keyboard opened or
+   *  closed, the browser scrolled): `reveal` the target, a pan only if it is
+   *  now covered. Only where the target is on show: while playing a `fit`
+   *  mode, or in feedback (whose policy is `reveal` in every mode). A finden
+   *  round in play keeps its target to itself. Waits for a travel still
+   *  under way, so it never reads a transform mid-flight. */
+  function onViewportSettled() {
+    viewportTimer = null;
+    const motion = MAP_MOTION[gameState.mode];
+    if (!game || !motion) return;
+    const onShow = gameState.phase === 'feedback'
+      ? motion.feedback === 'reveal'
+      : gameState.phase === 'playing' && motion.roundStart === 'fit';
+    if (!onShow) return;
+    if (d3.active(svgNode)) {
+      settleViewport();
+      return;
+    }
+    panToBounds(targetBounds(game.state.targetId));
+  }
+
   /** The gentle zoom (`fit`): fit projected `bounds` (`[[x0, y0], [x1,
    *  y1]]`, viewBox units) at 0.9 of motionArea(), centred in it, capped at
    *  TARGET_ZOOM_MAX. A point's zero bounds simply hit the cap. Never below
@@ -500,8 +625,15 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
    *  The area depends on the phase's panels, so call it after setPhase. */
   function zoomToBounds(bounds, duration = 750) {
     if (!bounds) return;
-    const { k, x, y } = fitBounds(bounds, motionArea(),
+    let fitted = fitBounds(bounds, motionArea(),
       { fill: 0.9, minScale: MIN_ZOOM, maxScale: TARGET_ZOOM_MAX });
+    // With a keyboard planned for, the band is small, and a target too big
+    // for it even at 1x (Niedersachsen on a phone) overflows it on both
+    // sides, the top one into the band feedback leaves too. Pan it inside
+    // that band, where it fits, so feedback's `reveal` finds it clear; the
+    // overflow then goes under the input box, which feedback takes away
+    if (keyboardInsets()) fitted = panIntoView(bounds, visibleArea(feedbackInset()), fitted);
+    const { k, x, y } = fitted;
 
     // zoom.transform does not apply the pan clamp by itself, so constrain the
     // target the same way a drag would be constrained.
@@ -522,15 +654,23 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
     if (!bounds) return;
     const current = d3.zoomTransform(svgNode);
     const area = visibleArea();
-    if (panIntoView(bounds, area, current) === current) return;
+    // Clear, give or take float noise: a travel that landed the target on the
+    // area's edge (a keyboard band's oversize target) needs no pan
+    if (isStill(panIntoView(bounds, area, current), current)) return;
     const panned = panIntoView(bounds, area, current, FEEDBACK_PAN_MARGIN_PX / pxPerUnit());
     if (panned === current) return;
     const { k, x, y } = panned;
     const target = zoom.constrain()(
       d3.zoomIdentity.translate(x, y).scale(k), viewBoxExtent(), zoom.translateExtent());
-    if (target.x === current.x && target.y === current.y) return;
+    if (isStill(target, current)) return;
     d3.select('#map').transition().duration(duration)
       .call(zoom.transform, target);
+  }
+
+  /** Whether going from transform `from` to `to` is no pan at all, give or
+   *  take float noise (EDGE_NOISE). */
+  function isStill(to, from) {
+    return Math.abs(to.x - from.x) < EDGE_NOISE && Math.abs(to.y - from.y) < EDGE_NOISE;
   }
 
   function resetZoom(duration = 300) {
@@ -543,11 +683,15 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
    *  so the areas are measured with that phase's panels. */
   function moveMap(moment, id) {
     const policy = MAP_MOTION[gameState.mode] && MAP_MOTION[gameState.mode][moment];
-    const bounds = () => isLandmarkMode(gameState.mode) ? landmarkBounds(id) : bundeslandBounds(id);
     // overview: on the untouched overview the reset changes nothing
     if (policy === 'overview') resetZoom();
-    else if (policy === 'fit') zoomToBounds(bounds());
-    else if (policy === 'reveal') panToBounds(bounds());
+    else if (policy === 'fit') zoomToBounds(targetBounds(id));
+    else if (policy === 'reveal') panToBounds(targetBounds(id));
+  }
+
+  /** The current mode's target `id`'s projected bounds. */
+  function targetBounds(id) {
+    return isLandmarkMode(gameState.mode) ? landmarkBounds(id) : bundeslandBounds(id);
   }
 
   /* === Data Loading === */
@@ -1065,7 +1209,11 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
     // is covered (the first round at a window size, or a finden mode's target
     // at the overview's edge) and otherwise leaves the map where it is
     rememberFeedbackStack();
-    moveMap('feedback', id);
+    // An open keyboard is closing now that the input is hidden: `reveal`
+    // against the screen it leaves, once the visual viewport has settled
+    // (onViewportSettled, the same pan), not against the keyboard's band
+    if (isKeyboard(shownInsets)) settleViewport(KEYBOARD_CLOSE_WAIT_MS);
+    else moveMap('feedback', id);
 
     if (gameState.autoAdvance) {
       gameState.advanceTimer = setTimeout(advanceRound, 1800);
@@ -1237,6 +1385,17 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
   }
 
   /* === Init === */
+  // One listener pins the panels to the visual viewport; a change during a
+  // round may bring the target back into view once it settles
+  followViewport();
+  if (window.visualViewport) {
+    const onViewport = () => {
+      followViewport();
+      if (gameState.phase !== 'idle') settleViewport();
+    };
+    window.visualViewport.addEventListener('resize', onViewport);
+    window.visualViewport.addEventListener('scroll', onViewport);
+  }
   setPhase('idle');
   setScreen('select');
   loadData().catch(err => console.error('Failed to load data:', err));

@@ -1,5 +1,10 @@
 /* === Reset + Global === */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* What the visual viewport hides of the page, in px: scrolled out at the top,
+   and under an on-screen keyboard at the bottom. main.js's one visualViewport
+   listener keeps them current (ADR 0004); the game panel and the bottom stack
+   add them, so they stay on the visible screen. The map doesn't. */
+:root { --vv-top: 0px; --vv-bottom: 0px; }
 html, body {
   width: 100%; height: 100%; overflow: hidden;
   font-family: 'Inter', system-ui, sans-serif;
@@ -232,7 +237,7 @@ body[data-settings-mode$="-landmark"] .settings-row--type { display: flex; }
 
 /* === Game Panel === */
 #game-panel {
-  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  position: fixed; top: calc(16px + var(--vv-top)); left: 50%; transform: translateX(-50%);
   max-width: 860px; width: calc(100% - 32px); z-index: 10;
   display: none;
   grid-template-columns: auto 1fr auto;
@@ -281,7 +286,7 @@ body[data-mode="find-landmark"] #game-prompt-type { display: block; }
 
 /* === Bottom Panel Stack === */
 .bottom-panels {
-  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: calc(16px + var(--vv-bottom)); left: 50%; transform: translateX(-50%);
   max-width: 860px; width: calc(100% - 32px); z-index: 10;
   display: flex; flex-direction: column; gap: 8px;
   pointer-events: none;
@@ -375,9 +380,9 @@ body[data-mode="explore"][data-phase="idle"] #btn-menu { display: block; }
   .overlay-card { padding: 24px 20px; }
   .overlay-title { font-size: 1.3rem; }
 
-  /* Game panel: full width, flush top */
+  /* Game panel: full width, flush with the visible top */
   #game-panel {
-    top: 0; left: 0; right: 0; transform: none;
+    top: var(--vv-top); left: 0; right: 0; transform: none;
     width: 100%; max-width: none;
     border-radius: 0 0 16px 16px;
     grid-template-columns: 1fr auto;
@@ -385,9 +390,10 @@ body[data-mode="explore"][data-phase="idle"] #btn-menu { display: block; }
   #game-wappen-wrap { display: none; }
   .game-hud { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
-  /* Bottom panels: edge-to-edge */
+  /* Bottom panels: edge-to-edge, flush with the visible bottom (the
+     input box rests on an on-screen keyboard) */
   .bottom-panels {
-    bottom: 0; left: 16px; right: 16px;
+    bottom: var(--vv-bottom); left: 16px; right: 16px;
     transform: none; width: auto; max-width: none;
   }
 

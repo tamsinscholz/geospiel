@@ -56,15 +56,39 @@ are German.
   converted from screen px through the SVG's screen CTM (`screenToViewBox` in
   `view-fit.mjs`, which takes the letterbox offset `e`/`f` into account), then
   intersected with the viewBox (`visibleBand`). Panels in a letterbox take nothing away. In the `idle`
-  phase (menu, Erkunden) it is the whole viewBox. `visibleArea(stackInset)` takes an
-  assumed bottom stack, in screen px above the map's bottom edge, for one not laid out yet.
+  phase (menu, Erkunden) it is the whole viewBox. It is also clipped to the visual
+  viewport, which the panels are pinned to (see below), so an on-screen keyboard counts
+  as one more panel. `visibleArea(stackInset, keyboard)` narrows it to the tightest band
+  (`tightestBand` in `view-fit.mjs`) with two plans for panels not laid out now: an
+  assumed bottom stack, in screen px above the map's bottom edge (the feedback stack,
+  which sits with no keyboard open), and an assumed keyboard (`{ top, bottom }` hidden
+  px), with the panels as they would be pinned above it (`pinnedBand`). Each panel's
+  resting position is its laid-out one less the current `--vv-*` offset.
 - **Motion area (`motionArea()`):** the visible area, except while playing a `fit` mode
-  (Landeshauptstadt benennen, Gewässer & Städte benennen), where its bottom is the higher
-  of the input panel and the remembered feedback stack (`feedbackInset()`): the band
-  feedback will leave. `rememberFeedbackStack()` measures the stack in every feedback,
+  (the three benennen modes), where it is the tightest band of the round: below the game
+  panel, above the input panel, above the remembered feedback stack
+  (`feedbackInset()`), and, with a keyboard remembered at this size
+  (`keyboardInsets()`), below the game panel and above the input panel as pinned to
+  that keyboard. `rememberFeedbackStack()` measures the stack in every feedback,
   per info-panel kind (`bundesland`, river, lake, city, capital), keeping the largest
   seen and the map size it was seen at; a different map size (a resize) leaves nothing
-  remembered, and then this is the playing band.
+  remembered, and then this is the playing band. With a keyboard remembered, the travel
+  then pans a target that overflows the band even at `k = 1` into the feedback band
+  (`panIntoView`), so the overflow is at the bottom, under the input box.
+- **Visual viewport (`followViewport()`, ADR 0004):** one listener on
+  `window.visualViewport`'s `resize` and `scroll` (and once at load) writes what the
+  visual viewport hides of the page to `--vv-top` (its `offsetTop`) and `--vv-bottom`
+  (`innerHeight - offsetTop - height`, at least 0; less than 1px counts as 0) on
+  `<html>` (`viewportInsets` in `view-fit.mjs`). The game panel and the bottom stack add
+  them in CSS; `#map` stays full-page. A browser without `visualViewport`, or a
+  pinch-zoomed page (`scale` off 1), counts as nothing hidden. When more than 15% of
+  `innerHeight` is hidden (`KEYBOARD_MIN_FRACTION`; a toolbar hides less) a keyboard is
+  open, and its insets are remembered, the largest per side, with the map size
+  (`rememberKeyboard()`). During a round, each event (re)starts a 150 ms timer
+  (`settleViewport()`); when it fires, `onViewportSettled()` runs `panToBounds` on the
+  target while playing a `fit` mode or in feedback, after any travel still under way.
+  `showFeedback()` defers its `reveal` the same way, up to 500 ms, while a keyboard is
+  open (it is closing: the input is hidden).
 - **Pan clamp:** `translateExtent` is the viewBox rectangle itself, and a custom
   `zoom.constrain()` runs d3's default clamp with the motion area as the viewport
   instead of the whole viewBox. So the viewBox only has to cover the visible area:
@@ -86,7 +110,9 @@ are German.
   `pathGenerator.bounds`, a city's point as zero bounds).
   `resetZoom` (`overview`) animates back to `k = 1` in 300 ms.
 - **Feedback pan (`reveal`, `panToBounds(bounds)`):** pan only, keeping `k`, and only if
-  the target is covered in feedback; see `docs/game-flow.md` section 10.
+  the target is covered in feedback; see `docs/game-flow.md` section 10. A pan shorter
+  than `EDGE_NOISE` (1e-6 viewBox units, float noise), before or after the clamp,
+  counts as none, so a target landed exactly on the area's edge starts no transition.
 - **Touch halo (`.hit-target`):** for each Bundesland with `area_km2` below
   `SMALL_TARGET_MAX_AREA_KM2 = 1000` (Berlin, Bremen, Hamburg), a duplicate path of its
   own geometry with `fill: none; stroke: transparent; stroke-linejoin: round`. It is
@@ -199,7 +225,8 @@ and `stats`).
 
 ## 3. Game Panel (`#game-panel`)
 
-- **Position:** fixed, top 16px, horizontally centred, `width: calc(100% - 32px)`,
+- **Position:** fixed, top `calc(16px + var(--vv-top))` (pinned to the visual
+  viewport's top, see section 1), horizontally centred, `width: calc(100% - 32px)`,
   max-width 860px, `z-index: 10`
 - **Layout:** grid `auto 1fr auto`: Landeswappen | prompt | HUD. 16px gap, 12px/20px padding
 - **Visibility:** `display: grid` when `data-phase` is `playing` or `feedback`, otherwise hidden
@@ -224,7 +251,7 @@ and `stats`).
   edge inside its radius. Blue fill (`#4a90d9`), width animated over 0.3s. Width =
   completed rounds ÷ total, where a round counts as completed once it reaches feedback.
 
-**Mobile (≤600px):** full width, `top: 0`, no transform, radius `0 0 16px 16px`, grid
+**Mobile (≤600px):** full width, `top: var(--vv-top)`, no transform, radius `0 0 16px 16px`, grid
 `1fr auto` with the Landeswappen column hidden. The HUD wraps with an 8px gap,
 right-aligned.
 
@@ -232,7 +259,8 @@ right-aligned.
 
 ## 4. Bottom Panel Stack (`.bottom-panels`)
 
-- **Position:** fixed, bottom 16px, horizontally centred, `width: calc(100% - 32px)`,
+- **Position:** fixed, bottom `calc(16px + var(--vv-bottom))`, so it rests on an
+  on-screen keyboard (section 1), horizontally centred, `width: calc(100% - 32px)`,
   max-width 860px, `z-index: 10`
 - **Layout:** flex column, 8px gap, top to bottom: the feedback
   bar, then whichever content panel is showing. The container is `pointer-events: none`
@@ -285,7 +313,7 @@ right-aligned.
 - **Wappen slot (`data-wappen`):** `shown`, or `none` for rivers and lakes in more than one
   Bundesland (the Bodensee): the slot is hidden and the grid becomes `1fr 2fr`.
 
-**Mobile (≤600px):** the stack sits at `bottom: 0` with `left/right: 16px` and no
+**Mobile (≤600px):** the stack sits at `bottom: var(--vv-bottom)` (0 with no keyboard) with `left/right: 16px` and no
 centring transform. The info panel is one centred column (Landeswappen centred, facts in
 one column), with radius `16px 16px 0 0`.
 
