@@ -55,7 +55,7 @@ The maintainer also asked for the feedback pan to be a per-mode option.
    | Mode | Round start | Feedback |
    |---|---|---|
    | Bundesland finden | `overview` | `reveal` |
-   | Bundesland benennen | `overview` | `none` → `reveal` (2026-10-05, see below) |
+   | Bundesland benennen | `overview` → `fit` | `none` → `reveal` (2026-10-05, see below) |
    | Landeshauptstadt benennen | `fit` | `reveal` |
    | Gewässer & Städte finden | `overview` | `reveal` |
    | Gewässer & Städte benennen | `fit` | `reveal` |
@@ -66,6 +66,13 @@ The maintainer also asked for the feedback pan to be a per-mode option.
    *Amended 2026-10-05:* the maintainer switched Bundesland benennen's feedback to
    `reveal`, like the finden modes. Every quiz mode now pans a covered target clear in
    feedback, and `none` is currently unused.
+
+   *Amended again 2026-10-05:* the maintainer also switched Bundesland benennen's round
+   start to `fit`, like the other two benennen modes. With `overview` the map stayed
+   still while playing and only moved once the facts box appeared, which read as a late
+   zoom. All three benennen modes now travel once at round start, and only the two
+   finden modes stay on the overview. This reverses the earlier "Keep Bundesland finden
+   and benennen on the overview" (commit 8cfdf6e) for Bundesland benennen.
 
 ## Rejected alternatives
 

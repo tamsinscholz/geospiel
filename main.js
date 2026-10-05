@@ -114,7 +114,7 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
    *  Erkunden isn't listed: it doesn't move the map. */
   const MAP_MOTION = {
     'find':            { roundStart: 'overview', feedback: 'reveal' },
-    'name-bundesland': { roundStart: 'overview', feedback: 'reveal' },
+    'name-bundesland': { roundStart: 'fit',      feedback: 'reveal' },
     'name-capital':    { roundStart: 'fit',      feedback: 'reveal' },
     'find-landmark':   { roundStart: 'overview', feedback: 'reveal' },
     'name-landmark':   { roundStart: 'fit',      feedback: 'reveal' },
@@ -997,12 +997,10 @@ import { visibleBand, fitBounds, panIntoView } from './view-fit.mjs';
 
     setPhase('playing');
 
-    // MAP_MOTION: the travelling modes (Landeshauptstadt benennen, Gewässer &
-    // Städte benennen) travel here, once per round, location to location, into
-    // the band feedback will leave. The others stay on the overview: zooming
-    // in for feedback and back out every round is tiring, and in Bundesland
-    // finden an un-zoomed start gives nothing away. After setPhase, so the
-    // areas are measured with the playing panels.
+    // MAP_MOTION: the three benennen modes travel here, once per round,
+    // location to location, into the band feedback will leave. The finden
+    // modes stay on the overview: there an un-zoomed start gives nothing away.
+    // After setPhase, so the areas are measured with the playing panels.
     moveMap('roundStart', id);
 
     if (gameState.mode === 'name-landmark') {

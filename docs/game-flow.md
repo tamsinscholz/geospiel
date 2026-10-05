@@ -144,7 +144,7 @@ in feedback, and `moveMap()` carries it out. Erkunden doesn't move the map.
 | Mode | Round start | Feedback |
 |---|---|---|
 | Bundesland finden | `overview` | `reveal` |
-| Bundesland benennen | `overview` | `reveal` |
+| Bundesland benennen | `fit` | `reveal` |
 | Landeshauptstadt benennen | `fit` | `reveal` |
 | Gewässer & Städte finden | `overview` | `reveal` |
 | Gewässer & Städte benennen | `fit` | `reveal` |
