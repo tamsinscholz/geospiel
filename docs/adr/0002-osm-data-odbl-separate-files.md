@@ -54,6 +54,13 @@ were both tried and found distracting.
 4. **Erkunden.** The OSM layers stay out of Erkunden until Erkunden gets its own credit
    (planned, not yet specified).
 
+   *Amended 2026-10-06:* Erkunden gets its own Einstellungen screen, which opens before
+   every Erkunden session and carries the same credits, the OpenStreetMap line included
+   (`.scratch/erkunden-landmarks/issues/01-erkunden-einstellungen-and-layers.md`). That
+   is the same reading of "upon application startup" as for the quiz modes, so the
+   condition is met. Erkunden may draw the OSM layers, and only those its Einstellungen
+   switch on.
+
 ## Consequences
 
 - The rest of the repo keeps CC BY-NC. Share-alike reaches only the two OSM files.
