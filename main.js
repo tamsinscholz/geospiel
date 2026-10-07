@@ -1,4 +1,4 @@
-import { createGame, landmarkPool, landmarkType, followRounds } from './game-core.mjs';
+import { createGame, landmarkPool, landmarkType, drawnLandmarkIds, followRounds } from './game-core.mjs';
 import { nearestLandmark } from './landmark-hit.mjs';
 import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tightestBand } from './view-fit.mjs';
 
@@ -34,6 +34,7 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
   const clickFeedback  = $('click-feedback');
   const guessInput     = $('guess-input');
   const settingsTitle  = $('settings-title');
+  const btnStart       = $('btn-start');
   const valRounds      = $('val-rounds');
   const valGuesses     = $('val-guesses');
   const chkAuto        = $('chk-auto');
@@ -42,6 +43,7 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
 
   /* === Constants === */
   const MODE_LABELS = {
+    'explore': 'Erkunden',
     'find': 'Bundesland finden',
     'name-bundesland': 'Bundesland benennen',
     'name-capital': 'Landeshauptstadt benennen',
@@ -170,6 +172,9 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
     landmarkRounds: null,
     // The Einstellungen type toggles, shared by both landmark modes
     landmarkTypes: { river: true, lake: true, city: true, capital: false },
+    // Erkunden's own switches: which landmark layers it draws. All off draws
+    // nothing, so Erkunden starts out as it always looked
+    exploreTypes: { river: false, lake: false, city: false, capital: false },
     maxGuesses: 3,
     autoAdvance: false,
     advanceTimer: null,
@@ -826,12 +831,17 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
         handleLandmarkClick(landmarkAt(event));
         return;
       }
-      // Click anywhere that is not a Bundesland (sea, letterbox, or the Kulisse,
-      // which lets clicks through) to dismiss the explore panel
-      if (!event.target.closest('.bundesland, .hit-target') && gameState.mode === 'explore') {
-        d3.selectAll('.bundesland').classed('highlighted', false);
-        countryPanel.classList.remove('visible');
-        lastTappedId = null;
+      if (gameState.mode === 'explore') {
+        // A drawn landmark wins over the Bundesland underneath (whose own
+        // click handler stood back for it)
+        const landmarkId = landmarkAt(event, exploreRecords);
+        if (landmarkId !== null) {
+          handleExploreLandmarkClick(landmarkId);
+          return;
+        }
+        // Click anywhere that is not a Bundesland (sea, letterbox, or the
+        // Kulisse, which lets clicks through) to dismiss the explore panel
+        if (!event.target.closest('.bundesland, .hit-target')) dismissExplore();
       }
     });
 
@@ -839,16 +849,31 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
     // would leave a stale tint behind
     svg.on('pointermove.landmark', (event) => {
       if (event.pointerType !== 'mouse') return;
+      if (gameState.mode === 'explore' && !gameState.screen) {
+        onExploreMove(event);
+        return;
+      }
       if (gameState.mode !== 'find-landmark' || gameState.phase !== 'playing') return;
       setHoveredLandmark(landmarkAt(event));
     });
-    svg.on('pointerleave.landmark', () => setHoveredLandmark(null));
+    svg.on('pointerleave.landmark', (event) => {
+      if (gameState.mode === 'explore') {
+        // A touch pointer leaves on every lift: a tapped landmark stays
+        // selected. A mouse takes a hovered landmark's panel with it, as a
+        // Bundesland's goes on mouseleave
+        if (event.pointerType !== 'mouse' || hoveredLandmarkId === null) return;
+        countryPanel.classList.remove('visible');
+        lastTappedId = null;
+      }
+      setHoveredLandmark(null);
+    });
 
     wireEvents();
   }
 
-  /** Draw every river, lake and city once (CSS decides when they show), and
-   *  project them into the resolver's records. Rivers are a `<g>` of a white
+  /** Draw every river, lake and city once (CSS decides when they show, by
+   *  mode and, in Erkunden, by each element's `data-type`), and project them
+   *  into the resolver's records. Rivers are a `<g>` of a white
    *  casing (shown only for the target) and the line itself. */
   function renderLandmarks() {
     d3.select('#river-group').selectAll('g')
@@ -856,6 +881,7 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
       .join('g')
       .attr('class', 'landmark river')
       .attr('data-id', d => featureId(d))
+      .attr('data-type', 'river')
       .call(river => {
         river.append('path').attr('class', 'river-casing').attr('d', pathGenerator);
         river.append('path').attr('class', 'river-line').attr('d', pathGenerator);
@@ -866,6 +892,7 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
       .join('path')
       .attr('class', 'landmark lake')
       .attr('data-id', d => featureId(d))
+      .attr('data-type', 'lake')
       .attr('d', pathGenerator);
 
     d3.select('#city-group').selectAll('circle')
@@ -873,6 +900,8 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
       .join('circle')
       .attr('class', 'landmark city')
       .attr('data-id', d => featureId(d))
+      // Städte and Landeshauptstädte are switched apart in Erkunden (CSS)
+      .attr('data-type', d => landmarkType(landmarksData[featureId(d)] || { type: 'city' }))
       .attr('cx', d => projection(d.geometry.coordinates)[0])
       .attr('cy', d => projection(d.geometry.coordinates)[1]);
 
@@ -893,10 +922,12 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
   }
 
   /** The landmark a pointer event is on, or null: the event in viewBox units
-   *  (d3.pointer on #map-group inverts the zoom), radii from screen px. */
-  function landmarkAt(event) {
+   *  (d3.pointer on #map-group inverts the zoom), radii from screen px. Only
+   *  `records` are candidates: all of them in the quiz, the drawn ones in
+   *  Erkunden. */
+  function landmarkAt(event, records = landmarkRecords) {
     const u = unitsPerPx();
-    return nearestLandmark(d3.pointer(event, g.node()), landmarkRecords, {
+    return nearestLandmark(d3.pointer(event, g.node()), records, {
       radius: HIT_RADIUS_PX * u,
       dotRadius: CITY_DOT_PX * u,
     });
@@ -910,43 +941,113 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
     d3.selectAll('.landmark').classed('hovered', d => featureId(d) === id);
   }
 
-  /* === Explore Mode === */
+  /* === Explore Mode ===
+   *
+   * The Bundesländer hover through their own mouseenter/mouseleave and tap
+   * through their click. The drawn landmarks (Erkunden's switches) have no
+   * pointer events: a mouse pointermove on the map resolves them, and a hit
+   * wins over the Bundesland underneath, which stands back while a landmark
+   * is hovered (`hoveredLandmarkId`). Moving off the landmark falls back to
+   * the Bundesland under the pointer. A tap or click resolves the same way.
+   * With every switch off nothing resolves, and Erkunden is as it always was.
+   */
   let lastTappedId = null;
 
+  /** The resolver's records for the landmarks Erkunden draws; set when
+   *  Erkunden starts. */
+  let exploreRecords = [];
+
   function onBundeslandEnter(event, d) {
-    if (gameState.mode !== 'explore') return;
-    const id = featureId(d);
+    if (gameState.mode !== 'explore' || hoveredLandmarkId !== null) return;
+    showExploreBundesland(featureId(d));
+  }
+
+  function onBundeslandLeave(event, d) {
+    if (gameState.mode !== 'explore' || hoveredLandmarkId !== null) return;
+    d3.select(bundeslandPath(featureId(d))).classed('highlighted', false);
+    countryPanel.classList.remove('visible');
+  }
+
+  /** Highlight Bundesland `id` and show its panel; no-op for an unknown id. */
+  function showExploreBundesland(id) {
     if (!bundeslaenderData[id]) return;
+    d3.selectAll('.bundesland').classed('highlighted', false);
     d3.select(bundeslandPath(id)).classed('highlighted', true);
     fillBundeslandInfo(id);
     countryPanel.classList.add('visible');
   }
 
-  function onBundeslandLeave(event, d) {
-    if (gameState.mode !== 'explore') return;
-    d3.select(bundeslandPath(featureId(d))).classed('highlighted', false);
+  /** Tint landmark `id` and show its facts; the Bundesland highlight goes. */
+  function showExploreLandmark(id) {
+    d3.selectAll('.bundesland').classed('highlighted', false);
+    setHoveredLandmark(id);
+    fillLandmarkInfo(id);
+    countryPanel.classList.add('visible');
+  }
+
+  /** Mouse hover: a drawn landmark within reach wins; moving off it falls
+   *  back to the Bundesland under the pointer (or none: the panel goes). */
+  function onExploreMove(event) {
+    const id = landmarkAt(event, exploreRecords);
+    if (id === hoveredLandmarkId) return;
+    if (id !== null) {
+      showExploreLandmark(id);
+      return;
+    }
+    setHoveredLandmark(null);
+    const under = event.target.closest('.bundesland, .hit-target');
+    if (under) {
+      showExploreBundesland(under.dataset.id);
+    } else {
+      countryPanel.classList.remove('visible');
+    }
+  }
+
+  /** Close the explore panel: no highlight, no tint, nothing selected. */
+  function dismissExplore() {
+    d3.selectAll('.bundesland').classed('highlighted', false);
+    setHoveredLandmark(null);
     countryPanel.classList.remove('visible');
+    lastTappedId = null;
   }
 
   function handleExploreClick(id) {
     if (lastTappedId === id) {
-      d3.selectAll('.bundesland').classed('highlighted', false);
-      countryPanel.classList.remove('visible');
-      lastTappedId = null;
+      dismissExplore();
     } else {
-      d3.selectAll('.bundesland').classed('highlighted', false);
-      d3.select(bundeslandPath(id)).classed('highlighted', true);
-      fillBundeslandInfo(id);
-      countryPanel.classList.add('visible');
+      setHoveredLandmark(null);
+      showExploreBundesland(id);
       lastTappedId = id;
     }
   }
 
+  /** A tap or click on a drawn landmark: the first selects it, a second
+   *  on the same one dismisses, as for a Bundesland. */
+  function handleExploreLandmarkClick(id) {
+    if (lastTappedId === id) {
+      dismissExplore();
+    } else {
+      showExploreLandmark(id);
+      lastTappedId = id;
+    }
+  }
+
+  /** Start Erkunden with the switches as set on its Einstellungen. CSS draws
+   *  the switched-on layers off `data-explore-layers`; the resolver gets
+   *  the same features. */
   function startExplore() {
+    gameState.exploreTypes = selectedTypes();
+    const drawn = new Set(drawnLandmarkIds(landmarksData, gameState.exploreTypes));
+    exploreRecords = landmarkRecords.filter(r => drawn.has(r.id));
+    body.dataset.exploreLayers = Object.keys(gameState.exploreTypes)
+      .filter(type => gameState.exploreTypes[type]).join(' ');
+    clearMapClasses();
     setMode('explore');
     setPhase('idle');
     setScreen(null);
     lastTappedId = null;
+    // The new layers' dots take their size for the current zoom
+    sizeLandmarks();
   }
 
   /* === Bundesland Click Handler === */
@@ -955,6 +1056,8 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
 
     if (gameState.mode === 'explore') {
       if (!bundeslaenderData[id]) return;
+      // A drawn landmark on top takes the click (the map's handler, next)
+      if (landmarkAt(event, exploreRecords) !== null) return;
       handleExploreClick(id);
     } else if (gameState.mode === 'find' && gameState.phase === 'playing') {
       handleFindClick(id);
@@ -1047,10 +1150,15 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
 
   function openSettings(mode) {
     gameState.mode = mode;
-    // CSS shows the type toggles off this, for the landmark modes only
+    // CSS shows the type toggles off this (landmark modes and Erkunden), and
+    // hides Runden, Versuche and Automatisch weiter in Erkunden
     body.dataset.settingsMode = mode;
     settingsTitle.textContent = MODE_LABELS[mode];
-    if (isLandmarkMode(mode)) {
+    btnStart.textContent = mode === 'explore' ? 'Erkunden starten' : 'Spiel starten';
+    if (mode === 'explore') {
+      // Erkunden's own switches, apart from the landmark modes' shared ones
+      for (const chk of typeToggles) chk.checked = gameState.exploreTypes[chk.dataset.type];
+    } else if (isLandmarkMode(mode)) {
       for (const chk of typeToggles) chk.checked = gameState.landmarkTypes[chk.dataset.type];
       roundsMax = Math.max(1, Object.keys(landmarkItems(selectedTypes())).length);
       valRounds.textContent = gameState.landmarkRounds === null
@@ -1320,11 +1428,7 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
     document.querySelectorAll('.mode-card').forEach(card => {
       card.addEventListener('click', () => {
         const mode = card.dataset.modeChoice;
-        if (mode === 'explore') {
-          startExplore();
-        } else {
-          openSettings(mode);
-        }
+        openSettings(mode);
       });
     });
 
@@ -1342,10 +1446,12 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
       });
     });
 
-    // Type toggles: the last one on can't be switched off (the click is
-    // ignored); otherwise Runden's maximum follows the pool size
+    // Type toggles: in a landmark mode the last one on can't be switched off
+    // (the click is ignored); otherwise Runden's maximum follows the pool
+    // size. In Erkunden they only choose layers, and all off is allowed
     for (const chk of typeToggles) {
       chk.addEventListener('click', (e) => {
+        if (gameState.mode === 'explore') return;
         if (!typeToggles.some(c => c.checked)) {
           e.preventDefault();
           return;
@@ -1358,7 +1464,10 @@ import { visibleBand, fitBounds, panIntoView, viewportInsets, pinnedBand, tighte
 
     // Settings buttons
     $('btn-back-settings').addEventListener('click', () => setScreen('select'));
-    $('btn-start').addEventListener('click', startGame);
+    btnStart.addEventListener('click', () => {
+      if (gameState.mode === 'explore') startExplore();
+      else startGame();
+    });
 
     // Game buttons
     $('btn-skip').addEventListener('click', skipRound);

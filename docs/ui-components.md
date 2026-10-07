@@ -122,7 +122,10 @@ are German.
   real `.bundesland` path, so highlights, the wrong-guess flash and scoring land on the
   visible shape. A mouse on a wide screen never sees it.
 - **Landmark layers (`.landmark-layer`):** `display: none` unless `data-mode` ends in
-  `-landmark` and `data-phase` is `playing` or `feedback`; `pointer-events: none` always,
+  `-landmark` and `data-phase` is `playing` or `feedback`, or `data-mode="explore"` with
+  no `data-screen`; there each feature shows only if its `data-type` (`river`, `lake`,
+  `city`, `capital`; landmarkType()) is listed in `data-explore-layers`, so all off shows
+  nothing. `pointer-events: none` always,
   since clicks and hover are resolved by distance in `main.js` (`nearestLandmark`, 12
   screen px). Pool and background features share every style.
   - **River (`<g class="landmark river" data-id>`):** a `.river-line` path, 1.5px
@@ -130,8 +133,9 @@ are German.
     shows for the target
   - **Lake (`path.landmark.lake`):** fill `#a9cdee`, edge `#3a78c2` 0.75px
   - **City (`circle.landmark.city`):** `#444` dot of 3.5 screen px radius with a 1px white rim
-  - **Hover (`.hovered`, Gewässer & Städte finden, mouse only):** faint orange: river
-    line `#f6b45c` 2.5px, lake fill `#fbd7a6`, dot `#f6b45c`
+  - **Hover (`.hovered`, Gewässer & Städte finden, mouse only; Erkunden, the landmark
+    whose facts are shown, hovered or tapped):** faint orange: river line `#f6b45c`
+    2.5px, lake fill `#fbd7a6`, dot `#f6b45c`
   - **Wrong click (`.wrong-guess`):** the Bundesland flash colours, `#e05555` (river line
     3px; lake and dot edged `#a02020`), removed after 600 ms
   - **Target (`.target`, orange `#f28c00`):** river line 4px over its white casing,
@@ -149,7 +153,9 @@ are German.
   stroke `#9a9a94`, `pointer-events: none`, no hover; the touch halos are inert.
 - **Touch interaction (Erkunden):** tapping a Bundesland highlights it and opens the info
   panel. Tapping another switches. Tapping the same one, or anything that is not a
-  `.bundesland`/`.hit-target` (sea, letterbox, Kulisse), dismisses it.
+  `.bundesland`/`.hit-target` (sea, letterbox, Kulisse), dismisses it. A tap within
+  12 screen px of a drawn landmark selects that landmark instead (`.hovered` tint, its
+  facts), resolved over the drawn layers only; the Bundesländer keep their normal look.
 
 ---
 
@@ -183,12 +189,16 @@ and `stats`).
 ### 2b. Einstellungen (`#screen-settings`)
 
 - **Card:** narrow variant (`.overlay-card--narrow`, max-width 420px)
-- **Title (`#settings-title`):** the mode's name, e.g. "Bundesland finden"
+- **Title (`#settings-title`):** the mode's name, e.g. "Erkunden", "Bundesland finden"
 - **Rows (`.settings-row`):** flex, space-between, 12px vertical padding, 1px `#eee` bottom border
   - **Type toggle rows (`.settings-row--type`):** "Flüsse", "Seen", "Städte",
     "Landeshauptstädte", above Runden; `display: none` unless
-    `body[data-settings-mode$="-landmark"]`. Each is a `.toggle` around
-    `input.chk-type[data-type]` (`river`, `lake`, `city`, `capital`)
+    `body[data-settings-mode$="-landmark"]` or `body[data-settings-mode="explore"]`.
+    Each is a `.toggle` around `input.chk-type[data-type]` (`river`, `lake`, `city`,
+    `capital`). One set of inputs: `openSettings()` loads the landmark modes' or
+    Erkunden's state into them
+  - **Quiz-only rows (`.settings-row--quiz`):** Runden, Versuche pro Runde, Automatisch
+    weiter; `display: none` under `body[data-settings-mode="explore"]`
   - **Label (`.settings-label`):** 0.95rem, bold 600, `#333`: "Runden", "Versuche pro
     Runde", "Automatisch weiter"
   - **Stepper (`.stepper`):** 12px gap. Buttons (`.stepper-btn`) 32×32px, 8px radius,
@@ -198,7 +208,7 @@ and `stats`).
   - **Toggle (`.toggle`):** 44×24px custom checkbox. Track `#ccc`, checked `#3a7bd5`.
     18px white knob slides 20px. 0.2s transitions
 - **Actions (`.settings-actions`):** right-aligned, 12px gap, 24px top margin:
-  "Zurück" (secondary), "Spiel starten" (primary)
+  "Zurück" (secondary), "Spiel starten" (primary; "Erkunden starten" for Erkunden)
 - **Credits (`#settings-credits.settings-credits`):** below the actions, 16px top margin,
   0.68rem, `#aaa`, line-height 1.4. Holds the credits required by `SOURCES.md` §2, §3/§4
   and §7 ("Kartengrundlage: © EuroGeographics bezüglich der Verwaltungsgrenzen" /

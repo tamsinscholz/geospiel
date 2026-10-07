@@ -9,6 +9,7 @@ import {
   matchLandmark,
   landmarkType,
   landmarkPool,
+  drawnLandmarkIds,
   followRounds,
 } from '../game-core.mjs';
 
@@ -576,6 +577,22 @@ test('the landmark pool never holds a background feature', () => {
 test('the landmark pool leaves out features without geometry', () => {
   const items = landmarkPool(poolFixture, { capital: true }, id => id !== 'K2');
   assert.deepStrictEqual(Object.keys(items), ['K1']);
+});
+
+test('Erkunden draws every feature of a switched-on type, background included', () => {
+  const ids = drawnLandmarkIds(poolFixture, { river: true, lake: false, city: false, capital: true });
+  assert.deepStrictEqual(ids.sort(), ['K1', 'K2', 'R1', 'R2']);
+});
+
+test('Städte and Landeshauptstädte draw apart in Erkunden', () => {
+  assert.deepStrictEqual(drawnLandmarkIds(poolFixture, { city: true }), ['C1']);
+  assert.deepStrictEqual(drawnLandmarkIds(poolFixture, { capital: true }).sort(), ['K1', 'K2']);
+});
+
+test('Erkunden with every switch off draws nothing', () => {
+  assert.deepStrictEqual(drawnLandmarkIds(poolFixture, { river: false, lake: false, city: false, capital: false }), []);
+  assert.deepStrictEqual(drawnLandmarkIds(poolFixture, {}), []);
+  assert.deepStrictEqual(drawnLandmarkIds(null, { river: true }), []);
 });
 
 test('a Runden value at the old maximum follows the new maximum', () => {

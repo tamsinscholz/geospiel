@@ -134,6 +134,17 @@ export function landmarkPool(landmarks, types, hasGeometry = () => true) {
 }
 
 /**
+ * The landmark ids Erkunden draws for its switches `types` (`{ river, lake,
+ * city, capital }` booleans): every feature whose type is switched on, pool
+ * and background alike. Erkunden's hover and tap resolve over these only, so
+ * a hidden layer is never hit. All off draws nothing.
+ */
+export function drawnLandmarkIds(landmarks, types) {
+  return Object.keys(landmarks || {})
+    .filter(id => Boolean(types && types[landmarkType(landmarks[id])]));
+}
+
+/**
  * The Runden value after its maximum changes from `oldMax` to `newMax` (the
  * type toggles changed the pool size): a value at the old maximum follows the
  * new one, any other value is clamped to `1..newMax`.

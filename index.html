@@ -19,8 +19,9 @@
 
   <!-- SVG Map -->
   <!-- Layers bottom to top. The landmark groups (rivers, lakes, cities, the
-       marker) show only in the landmark modes while playing or in feedback
-       (CSS); they take no pointer events, landmark-hit.mjs resolves clicks -->
+       marker) show only in the landmark modes while playing or in feedback,
+       and in Erkunden for its switched-on types (CSS); they take no pointer
+       events, landmark-hit.mjs resolves clicks and hover -->
   <svg id="map" preserveAspectRatio="xMidYMid meet"><g id="map-group"><g id="kulisse-group"></g><g id="bundesland-group"></g><g id="hit-group"></g><g id="river-group" class="landmark-layer"></g><g id="lake-group" class="landmark-layer"></g><g id="city-group" class="landmark-layer"></g><g id="marker-group" class="landmark-layer"></g></g></svg>
 
   <!-- Explore Quit Button -->
@@ -134,7 +135,9 @@
   <div id="screen-settings" class="overlay-screen">
     <div class="overlay-card overlay-card--narrow">
       <h1 class="overlay-title" id="settings-title"></h1>
-      <!-- Type toggles: landmark modes only (CSS off data-settings-mode) -->
+      <!-- Type toggles: landmark modes and Erkunden (CSS off data-settings-mode);
+           Erkunden's own state, loaded and saved by main.js. The quiz-only
+           rows (.settings-row--quiz) are hidden in Erkunden -->
       <div class="settings-row settings-row--type">
         <span class="settings-label">Flüsse</span>
         <label class="toggle"><input type="checkbox" class="chk-type" data-type="river" /><span class="toggle-track"></span></label>
@@ -151,7 +154,7 @@
         <span class="settings-label">Landeshauptstädte</span>
         <label class="toggle"><input type="checkbox" class="chk-type" data-type="capital" /><span class="toggle-track"></span></label>
       </div>
-      <div class="settings-row">
+      <div class="settings-row settings-row--quiz">
         <span class="settings-label">Runden</span>
         <div class="stepper">
           <button class="stepper-btn" data-setting="rounds" data-dir="-1">&minus;</button>
@@ -159,7 +162,7 @@
           <button class="stepper-btn" data-setting="rounds" data-dir="1">+</button>
         </div>
       </div>
-      <div class="settings-row">
+      <div class="settings-row settings-row--quiz">
         <span class="settings-label">Versuche pro Runde</span>
         <div class="stepper">
           <button class="stepper-btn" data-setting="guesses" data-dir="-1">&minus;</button>
@@ -167,7 +170,7 @@
           <button class="stepper-btn" data-setting="guesses" data-dir="1">+</button>
         </div>
       </div>
-      <div class="settings-row">
+      <div class="settings-row settings-row--quiz">
         <span class="settings-label">Automatisch weiter</span>
         <label class="toggle">
           <input type="checkbox" id="chk-auto" />

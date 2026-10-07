@@ -63,9 +63,11 @@ svg[hidden] { display: none; }
 }
 
 /* === Landmark layers (Gewässer & Städte) ===
-   Rivers, lakes, city dots and the marker, drawn only in the two landmark
-   modes (`[data-mode$="-landmark"]`) while playing or in feedback; hidden
-   behind the menu and in every other mode. They take no pointer events:
+   Rivers, lakes, city dots and the marker, drawn in the two landmark modes
+   (`[data-mode$="-landmark"]`) while playing or in feedback, and in Erkunden
+   (no overlay showing) the types its switches turned on, listed in
+   `data-explore-layers`; hidden behind the menu and in every other mode.
+   They take no pointer events:
    main.js resolves a click or hover on #map through landmark-hit.mjs. Pool
    and background features share every style, so the drawing never hints at
    the target. The radii of dots and marker are set in viewBox units by the
@@ -73,12 +75,20 @@ svg[hidden] { display: none; }
 .landmark-layer { display: none; pointer-events: none; }
 body[data-mode$="-landmark"][data-phase="playing"] .landmark-layer,
 body[data-mode$="-landmark"][data-phase="feedback"] .landmark-layer { display: inline; }
+body[data-mode="explore"]:not([data-screen]) .landmark-layer { display: inline; }
+body[data-mode="explore"] .landmark { display: none; }
+body[data-mode="explore"][data-explore-layers~="river"] .landmark[data-type="river"],
+body[data-mode="explore"][data-explore-layers~="lake"] .landmark[data-type="lake"],
+body[data-mode="explore"][data-explore-layers~="city"] .landmark[data-type="city"],
+body[data-mode="explore"][data-explore-layers~="capital"] .landmark[data-type="capital"] { display: inline; }
 .river-line { fill: none; stroke: #3a78c2; stroke-width: 1.5px; stroke-linejoin: round; stroke-linecap: round; }
 .river-casing { display: none; fill: none; stroke: #fff; stroke-width: 7px; stroke-linejoin: round; stroke-linecap: round; }
 .lake { fill: #a9cdee; stroke: #3a78c2; stroke-width: 0.75px; }
 .city { fill: #444; stroke: #fff; stroke-width: 1px; }
 /* Hover (mouse only, Gewässer & Städte finden): the feature a click would
-   hit, tinted a faint orange. It says which feature, not whether it's right */
+   hit, tinted a faint orange. It says which feature, not whether it's right.
+   In Erkunden the same tint marks the landmark whose facts are shown, hovered
+   or tapped */
 .river.hovered .river-line { stroke: #f6b45c; stroke-width: 2.5px; }
 .lake.hovered { fill: #fbd7a6; stroke: #f6b45c; }
 .city.hovered { fill: #f6b45c; }
@@ -177,9 +187,12 @@ body[data-screen="stats"] #screen-stats { display: flex; }
   padding: 12px 0; border-bottom: 1px solid #eee;
 }
 .settings-label { font-size: 0.95rem; font-weight: 600; color: #333; }
-/* The type toggles: only in a landmark mode's Einstellungen */
+/* The type toggles: only in a landmark mode's and Erkunden's Einstellungen.
+   Erkunden has no rounds: Runden, Versuche and Automatisch weiter go */
 .settings-row--type { display: none; }
-body[data-settings-mode$="-landmark"] .settings-row--type { display: flex; }
+body[data-settings-mode$="-landmark"] .settings-row--type,
+body[data-settings-mode="explore"] .settings-row--type { display: flex; }
+body[data-settings-mode="explore"] .settings-row--quiz { display: none; }
 .stepper { display: flex; align-items: center; gap: 12px; }
 .stepper-btn {
   width: 32px; height: 32px; border-radius: 8px;

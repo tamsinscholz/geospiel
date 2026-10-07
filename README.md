@@ -26,7 +26,9 @@ make test
 ## The four modes
 
 - **Erkunden**: hover (or tap) a Bundesland to see its Landeswappen, Landeshauptstadt,
-  Fläche, Einwohner, höchster Punkt and number of Nachbarländer. Nothing is scored.
+  Fläche, Einwohner, höchster Punkt and number of Nachbarländer. Its Einstellungen can
+  also draw Flüsse, Seen, Städte and Landeshauptstädte; hover or tap one for its facts.
+  Nothing is scored.
 - **Bundesland finden**: you get a Bundesland's name and Landeswappen and click it on the map.
 - **Bundesland benennen**: a Bundesland is highlighted and its Landeswappen shown, and
   you type its name. Umlauts are optional, and abbreviations (`NRW`), official long forms

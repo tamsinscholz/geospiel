@@ -31,7 +31,9 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
   11 lakes (drawn above the rivers) and 24 city dots, every one of them whether or not it
   can be asked, all drawn alike. The Bundesländer turn a lighter grey there and stop
   reacting to the pointer. Lines and dots stay the same size on screen at every zoom.
-  The layers are never drawn in Erkunden, in the Bundesland modes or behind the menu.
+  In Erkunden only the types switched on in its Einstellungen are drawn (none by
+  default), with the Bundesländer keeping their normal look. The layers are never drawn
+  in the Bundesland modes or behind the menu.
 
 ---
 
@@ -57,8 +59,7 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
   "© 2026 Krautlabs Inc."
 
 **User actions:**
-- **Erkunden**: the overlay closes and Erkunden starts.
-- Any quiz mode: opens the Einstellungen screen for it.
+- **Erkunden** or any quiz mode: opens the Einstellungen screen for it.
 
 ---
 
@@ -66,6 +67,10 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
 
 **What the user sees:**
 - The interactive map, and a "Beenden" button fixed top-right.
+- The landmark layers switched on in Erkunden's Einstellungen (Flüsse: all 18 rivers;
+  Seen: all 11 lakes; Städte: the 8 cities without `capital_of`; Landeshauptstädte: the
+  16 with it), drawn as in the landmark modes. All off (the default) draws none, and
+  Erkunden looks as it did before the layers existed. The map never moves by itself.
 
 **User actions:**
 - **Hover a Bundesland (mouse):** it turns orange (`.highlighted`) and the info panel
@@ -77,31 +82,40 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
     other Bundesländer it borders)
   - Numbers use `de-DE` formatting.
 - **Mouse leaves the Bundesland:** the highlight and the panel go away.
+- **Hover a drawn landmark (mouse, within 12 screen px, `nearestLandmark`; ties city,
+  then lake, then river):** it wins over the Bundesland underneath. The landmark takes
+  the faint orange hover tint (`.hovered`), the Bundesland highlight goes, and the info
+  panel shows its facts exactly as in quiz feedback (see "Info panel" under Feedback:
+  rows by type, Wappen rule, `de-DE` numbers; "Landeshauptstadt von …" for a capital).
+  Moving off it falls back to the Bundesland under the pointer, or to no panel. Only
+  drawn layers are hit: with Städte off, the Köln dot's spot gives the Rhein if Flüsse
+  is on, otherwise Nordrhein-Westfalen.
 - **Tap a Bundesland (touch):** same highlight and panel. Tapping a different Bundesland
   switches to it. Tapping the same one again, or anything that is not a Bundesland (sea,
-  letterbox, Kulisse), dismisses it.
+  letterbox, Kulisse), dismisses it. A tap on a drawn landmark selects it the same way
+  (tint and its panel), and wins over the Bundesland underneath.
 - **Beenden:** back to the menu. The zoom resets (300 ms).
 
 ---
 
-## 3. Einstellungen (`data-screen="settings"`, quiz modes only)
+## 3. Einstellungen (`data-screen="settings"`)
 
 **What the user sees:**
-- An overlay card titled with the mode's name ("Bundesland finden",
+- An overlay card titled with the mode's name ("Erkunden", "Bundesland finden",
   "Bundesland benennen", "Landeshauptstadt benennen", "Gewässer & Städte finden" or
   "Gewässer & Städte benennen").
 
 | Setting | Control | Range | Default |
 |---|---|---|---|
-| "Flüsse" | toggle (landmark modes only) | on/off | on (10 pool rivers) |
-| "Seen" | toggle (landmark modes only) | on/off | on (7 pool lakes) |
-| "Städte" | toggle (landmark modes only) | on/off | on (8 cities that are not Landeshauptstädte) |
-| "Landeshauptstädte" | toggle (landmark modes only) | on/off | off (16) |
-| "Runden" | stepper (−/+) | 1–16; landmark modes: 1–selected pool size | 16; landmark modes: the pool size (25) |
-| "Versuche pro Runde" | stepper (−/+) | 1–10 | 3 |
-| "Automatisch weiter" | toggle | on/off | off |
+| "Flüsse" | toggle (landmark modes, Erkunden) | on/off | on (10 pool rivers); Erkunden: off |
+| "Seen" | toggle (landmark modes, Erkunden) | on/off | on (7 pool lakes); Erkunden: off |
+| "Städte" | toggle (landmark modes, Erkunden) | on/off | on (8 cities that are not Landeshauptstädte); Erkunden: off |
+| "Landeshauptstädte" | toggle (landmark modes, Erkunden) | on/off | off (16) |
+| "Runden" | stepper (−/+), not in Erkunden | 1–16; landmark modes: 1–selected pool size | 16; landmark modes: the pool size (25) |
+| "Versuche pro Runde" | stepper (−/+), not in Erkunden | 1–10 | 3 |
+| "Automatisch weiter" | toggle, not in Erkunden | on/off | off |
 
-- Buttons "Zurück" and "Spiel starten".
+- Buttons "Zurück" and "Spiel starten" ("Erkunden starten" for Erkunden).
 - Below them, in small muted text, the data credits "Kartengrundlage: © EuroGeographics
   bezüglich der Verwaltungsgrenzen", "Gewässer und Städte: © OpenStreetMap-Mitwirkende,
   ODbL" ("OpenStreetMap" links to its copyright page) and "Einwohner und Fläche:
@@ -111,9 +125,15 @@ strings are quoted exactly as the app shows them (`index.html`, `main.js`).
 The values are remembered while the page is open: they are saved when a game starts and
 shown again the next time this screen opens, for any mode. Runden is kept separately for
 the Bundesland modes and the landmark modes; the type toggles are shared by the landmark
-modes. The four toggles show only for a landmark mode (CSS off `data-settings-mode`).
+modes. The four toggles show only for a landmark mode and Erkunden, and Runden, Versuche
+and Automatisch weiter are hidden for Erkunden (CSS off `data-settings-mode`).
 
-- **Type toggles:** the last toggle that is on can't be switched off (the click is
+- **Erkunden's switches** are its own (`gameState.exploreTypes`), saved when Erkunden
+  starts: they neither read nor change the landmark modes' shared toggles, nor the other
+  way round. They choose what is drawn, not what is asked, so every feature of a
+  switched-on type is drawn, pool and background alike. All four off is allowed.
+
+- **Type toggles (landmark modes):** the last toggle that is on can't be switched off (the click is
   ignored). Each change moves Runden's maximum to the new pool size (Flüsse 10, Seen 7,
   Städte 8, Landeshauptstädte 16): a Runden value that was at the old maximum follows the
   new one, any other is clamped (e.g. 25 → Landeshauptstädte on → 41; 20 stays 20 until
@@ -393,8 +413,8 @@ average.
 ## State machine
 
 ```
-Menu ──Erkunden──→ Erkunden ──Beenden──→ Menu
- │
+Menu ──Erkunden──→ Einstellungen ──Erkunden starten──→ Erkunden ──Beenden──→ Menu
+ │                       └──Zurück──→ Menu
  └─quiz mode─→ Einstellungen ──Zurück──→ Menu
                     │
                Spiel starten
@@ -421,7 +441,8 @@ from Playing. Überspringen is hidden in feedback and only exists in Playing.
 |---|---|---|
 | `data-phase` | `idle` (menu, Einstellungen, Erkunden, Spiel beendet) · `playing` · `feedback` | `setPhase()` |
 | `data-mode` | `explore` · `find` · `name-bundesland` · `name-capital` · `find-landmark` · `name-landmark` | `setMode()`, when Erkunden or a game starts. Opening Einstellungen does not change it, and it keeps its last value on the menu. CSS matches the landmark modes as `[data-mode$="-landmark"]` |
-| `data-settings-mode` | the mode whose Einstellungen were last opened | `openSettings()`; shows the type toggles for a landmark mode |
+| `data-settings-mode` | the mode whose Einstellungen were last opened | `openSettings()`; shows the type toggles for a landmark mode and Erkunden, hides Runden, Versuche and Automatisch weiter for Erkunden |
+| `data-explore-layers` | the landmark types Erkunden draws, space-separated (`river lake city capital`, any subset; empty when all are off) | `startExplore()`. CSS shows each `.landmark[data-type]` off it (`~=`), in Erkunden with no overlay |
 | `data-screen` | `select` · `settings` · `stats` · absent (no overlay: Erkunden and a game in progress) | `setScreen()` |
 | `data-auto-advance` | `on` · `off` | `startGame()`, for the whole game |
 
@@ -432,6 +453,6 @@ mirrors the first two to `data-phase`, and on `finished` it shows Spiel beendet 
 JS only sets these attributes and fills in text. CSS attribute selectors decide which
 panels, overlays and buttons are visible, and there are no per-element show/hide calls.
 Two exceptions are toggled directly: the Erkunden info panel (class `visible`, on
-hover/tap) and the average row on Spiel beendet (`style.display`). The info panel's rows
+hover/tap; the landmark tint there is the `.hovered` class) and the average row on Spiel beendet (`style.display`). The info panel's rows
 follow its own `data-kind` (`bundesland`, `river`, `lake`, `city`) and `data-wappen`
 (`shown`, `none`), and the wrong-click line shows while it has text (`:empty`).
